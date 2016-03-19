@@ -3,7 +3,7 @@
 %%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/simpre/ebin pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
 
 main([]) ->
-    io:format("Usage: ./sub.escript <subject>~n");
+    io:format("Usage: ./sub.escript subject1 [subject2, ...]~n");
 
 main(Subjects) ->
     application:start(teacup),
@@ -14,7 +14,7 @@ main(Subjects) ->
 
 loop(Conn) ->
     receive
-        {nats@tc, Conn, {msg, {<<"teacup.control">>, _, _, _}, <<"exit">>}} ->
+        {nats@tc, Conn, {msg, <<"teacup.control">>, _, <<"exit">>}} ->
             io:format("received exit msg.");
         {nats@tc, Conn, Msg} ->
             io:format("Received NATS msg: ~p~n", [Msg]),

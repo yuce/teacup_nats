@@ -163,12 +163,14 @@ interp_message({info, BinInfo}, State) ->
     teacup_server:cast(self(), ready),
     {[], NewState};
     
-interp_message({msg, {_Subject, Sid, _ReplyTo, _PayloadSize}, _Payload} = Msg,
+interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
                #{ref@ := Ref,
                  sid_to_key := SidToKey} = State) ->
     case maps:get(Sid, SidToKey, undefined) of
         undefined -> ok;
-        {_, Pid} -> Pid ! {?MSG, teacup:ref(Ref), Msg}
+        {_, Pid} ->
+            Resp = {msg, Subject, ReplyTo, Payload},
+            Pid ! {?MSG, teacup:ref(Ref), Resp}
     end,
     {[], State}.    
     
