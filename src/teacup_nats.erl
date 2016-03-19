@@ -32,6 +32,12 @@
 
 -export([new/0,
          new/1,
+         connect/0,
+         connect/2,
+         connect/3,
+         connect_sync/0,
+         connect_sync/2,
+         connect_sync/3,
          ping/1,
          pub/2,
          pub/3,
@@ -40,6 +46,9 @@
          unsub/2,
          unsub/3]).
 
+-define(DEFAULT_HOST, <<"127.0.0.1">>).
+-define(DEFAULT_PORT, 4222).
+
 %% == API
 
 new() ->
@@ -47,6 +56,33 @@ new() ->
  
 new(Opts) ->
     teacup:new(nats@tc, Opts).
+
+connect() ->
+    connect(?DEFAULT_HOST, ?DEFAULT_PORT, #{}).
+    
+connect(Host, Port) ->
+    connect(Host, Port, #{}).
+    
+connect(Host, Port, Opts) ->
+    {ok, Conn} = teacup:new(nats@tc, Opts),
+    teacup:connect(Conn, Host, Port),
+    {ok, Conn}.
+    
+connect_sync() ->
+    connect_sync(?DEFAULT_HOST, ?DEFAULT_PORT, #{}).
+    
+connect_sync(Host, Port) ->
+    connect_sync(Host, Port, #{}).
+    
+connect_sync(Host, Port, Opts) ->    
+    {ok, Conn} = teacup:new(nats@tc, Opts),
+    teacup:connect(Conn, Host, Port),
+    receive
+        {nats@tc, Conn, ready} ->
+            {ok, Conn}
+    after 1000 ->
+        {error, not_ready}
+    end.
 
 -spec ping(Ref :: teacup:teacup_ref()) -> ok.    
 ping(Ref) ->
