@@ -31,15 +31,6 @@
 -module(nats@tc).
 -behaviour(teacup_server).
 
--export([new/0,
-         new/1,
-         ping/1,
-         pub/2,
-         pub/3,
-         sub/2,
-         sub/3,
-         unsub/2,
-         unsub/3]).
 -export([teacup@init/1,
          teacup@status/2,
          teacup@data/2,
@@ -48,53 +39,19 @@
 -define(MSG, ?MODULE).
 -define(VERSION, <<"0.1.0">>).
 
-%% == API
-
-new() ->
-    teacup:new(?MODULE).
-    
-new(#{verbose := _,
-      pedantic := _,
-      ssl_required := _,
-      auth_token := _,
-      user := _,
-      pass := _} = Opts) ->
-    teacup:new(?MODULE, Opts).
-    
-ping(Ref) ->
-    teacup:cast(Ref, ping).
-
-pub(Ref, Subject) ->
-    pub(Ref, Subject, #{}).
-
-pub(Ref, Subject, Opts) ->
-    teacup:cast(Ref, {pub, Subject, Opts}).                        
-
-sub(Ref, Subject) ->
-    sub(Ref, Subject, #{}).
-
-sub(Ref, Subject, Opts) ->
-    teacup:cast(Ref, {sub, Subject, Opts, self()}).    
-
-unsub(Ref, Subject) ->
-    unsub(Ref, Subject, #{}).
-
-unsub(Ref, Subject, Opts) ->
-    teacup:cast(Ref, {unsub, Subject, Opts, self()}).
-
 %% == Callbacks
     
 teacup@init(Opts) ->
     NewOpts = maps:merge(default_opts(), Opts),
-    {ok, NewOpts}.
+    {ok, NewOpts#{ready => false}}.
     
 teacup@status(connect, State) ->
     NewState = State#{data_acc => <<>>,
-                      info_received => false,
                       server_info => #{},
                       next_sid => 0,
                       sid_to_key => #{},
-                      key_to_sid => #{}},
+                      key_to_sid => #{},
+                      ready => false},
     {ok, NewState};
     
 teacup@status(disconnect, State) ->
@@ -106,11 +63,12 @@ teacup@data(Data, #{data_acc := DataAcc} = State) ->
     State1 = interp_messages(Messages, State),
     {ok, State1#{data_acc => Remaining}}.
 
-teacup@cast(ping, State) ->
+teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
     {noreply, State};
     
-teacup@cast({pub, Subject, Opts}, State) ->
+teacup@cast({pub, Subject, Opts},
+            #{ready := true} = State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),
     Payload = maps:get(payload, Opts, <<>>),
     BinMsg = nats_msg:pub(Subject, ReplyTo, Payload),
@@ -119,7 +77,8 @@ teacup@cast({pub, Subject, Opts}, State) ->
     
 teacup@cast({sub, Subject, Opts, Pid}, #{next_sid := DefaultSid,
                                          sid_to_key := SidToKey,
-                                         key_to_sid := KeyToSid} = State) ->
+                                         key_to_sid := KeyToSid,
+                                         ready := true} = State) ->
     K = {Subject, Pid},
     Sid = maps:get(K, KeyToSid, integer_to_binary(DefaultSid)),
     NewKeyToSid = maps:put(K, Sid, KeyToSid),
@@ -132,7 +91,8 @@ teacup@cast({sub, Subject, Opts, Pid}, #{next_sid := DefaultSid,
                       key_to_sid => NewKeyToSid},
     {noreply, NewState};
     
-teacup@cast({unsub, Subject, Opts, Pid}, #{key_to_sid := KeyToSid} = State) ->
+teacup@cast({unsub, Subject, Opts, Pid}, #{key_to_sid := KeyToSid,
+                                           ready := true} = State) ->
     % Should we crash if Sid for Pid not found?
     Sid = maps:get({Subject, Pid}, KeyToSid, undefined),
     case Sid of
@@ -143,6 +103,16 @@ teacup@cast({unsub, Subject, Opts, Pid}, #{key_to_sid := KeyToSid} = State) ->
             BinMsg = nats_msg:unsub(Sid, MaxMsgs),
             teacup_server:send(self(), BinMsg)
     end,
+    {noreply, State};
+    
+teacup@cast(ready, #{ready := false,
+                     parent@ := Parent,
+                     ref@ := Ref} = State) ->
+    Parent ! {?MSG, teacup:ref(Ref), ready},
+    {noreply, State#{ready => true}};
+    
+teacup@cast(ready, State) ->
+    % Ignore ready messages received after the first
     {noreply, State}.
 
 %% == Internal
@@ -172,6 +142,10 @@ interp_messages(Messages, State) ->
     end,
     NewState.
 
+% interp_message(ok, State) ->
+%     io:format("Received OK msg~n"),
+%     {[], State};
+
 interp_message(ping, State) ->
     % Send pong messages immediately
     teacup_server:send(self(), nats_msg:pong()),
@@ -182,10 +156,12 @@ interp_message(pong, State) ->
     {[], State};
     
 interp_message({info, BinInfo}, State) ->
+    % Send connect messages immediately
     Info = jsx:decode(BinInfo, [return_maps]),
-    NewState = State#{server_info => Info,
-                      info_received => true},
-    {client_info(NewState), NewState};
+    NewState = State#{server_info => Info},
+    teacup_server:send(self(), client_info(NewState)),
+    teacup_server:cast(self(), ready),
+    {[], NewState};
     
 interp_message({msg, {_Subject, Sid, _ReplyTo, _PayloadSize}, _Payload} = Msg,
                #{ref@ := Ref,
