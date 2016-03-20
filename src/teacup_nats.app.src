@@ -1,5 +1,5 @@
 {application, teacup_nats,
- [{description, "Teacup NATS Handler"},
+ [{description, "Teacup based NATS Client for Erlang"},
   {vsn, "0.2.2"},
   {registered, []},
   {applications,

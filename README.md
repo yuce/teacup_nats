@@ -1,6 +1,6 @@
 # teacup_nats
 
-Teacup NATS Handler
+Teacup based NATS Client for Erlang
 
 ## Build
 
