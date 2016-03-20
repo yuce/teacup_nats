@@ -48,6 +48,7 @@
 
 -define(DEFAULT_HOST, <<"127.0.0.1">>).
 -define(DEFAULT_PORT, 4222).
+-define(HANDLER, nats@teacup).
 
 %% == API
 
@@ -55,7 +56,7 @@ new() ->
     new(#{}).
  
 new(Opts) ->
-    teacup:new(nats@tc, Opts).
+    teacup:new(?HANDLER, Opts).
 
 connect() ->
     connect(?DEFAULT_HOST, ?DEFAULT_PORT, #{}).
@@ -64,7 +65,7 @@ connect(Host, Port) ->
     connect(Host, Port, #{}).
     
 connect(Host, Port, Opts) ->
-    {ok, Conn} = teacup:new(nats@tc, Opts),
+    {ok, Conn} = teacup:new(?HANDLER, Opts),
     teacup:connect(Conn, Host, Port),
     {ok, Conn}.
     
@@ -75,10 +76,10 @@ connect_sync(Host, Port) ->
     connect_sync(Host, Port, #{}).
     
 connect_sync(Host, Port, Opts) ->    
-    {ok, Conn} = teacup:new(nats@tc, Opts),
+    {ok, Conn} = teacup:new(?HANDLER, Opts),
     teacup:connect(Conn, Host, Port),
     receive
-        {nats@tc, Conn, ready} ->
+        {Conn, ready} ->
             {ok, Conn}
     after 1000 ->
         {error, not_ready}

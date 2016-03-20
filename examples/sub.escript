@@ -13,9 +13,9 @@ main(Subjects) ->
 
 loop(Conn) ->
     receive
-        {nats@tc, Conn, {msg, <<"teacup.control">>, _, <<"exit">>}} ->
+        {Conn, {msg, <<"teacup.control">>, _, <<"exit">>}} ->
             io:format("received exit msg.");
-        {nats@tc, Conn, Msg} ->
+        {Conn, Msg} ->
             io:format("Received NATS msg: ~p~n", [Msg]),
             loop(Conn);
         Other ->
@@ -24,7 +24,7 @@ loop(Conn) ->
     
 loop_ready(Conn, Subjects) ->
     receive
-        {nats@tc, Conn, ready} ->
+        {Conn, ready} ->
             NewSubjects = [<<"teacup.*">> | Subjects],
             subscribe(Conn, NewSubjects),
             loop(Conn);

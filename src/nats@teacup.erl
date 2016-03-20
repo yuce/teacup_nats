@@ -28,12 +28,13 @@
 % (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 % OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
--module(nats@tc).
+-module(nats@teacup).
 -behaviour(teacup_server).
 
 -export([teacup@init/1,
          teacup@status/2,
          teacup@data/2,
+         teacup@error/2,
          teacup@cast/2]).
 
 -define(MSG, ?MODULE).
@@ -55,13 +56,19 @@ teacup@status(connect, State) ->
     {ok, NewState};
     
 teacup@status(disconnect, State) ->
-    {reconnect, State}.
+    % {reconnect, State}.
+    {stop, State}.
     
 teacup@data(Data, #{data_acc := DataAcc} = State) ->
     NewData = <<DataAcc/binary, Data/binary>>,
     {Messages, Remaining} = nats_msg:decode(NewData),
     State1 = interp_messages(Messages, State),
     {ok, State1#{data_acc => Remaining}}.
+    
+teacup@error(Reason, #{parent@ := Parent,
+                       ref@ := Ref}) ->
+    Parent ! {Ref, {error, Reason}},
+    {error, Reason}.
 
 teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
@@ -108,7 +115,7 @@ teacup@cast({unsub, Subject, Opts, Pid}, #{key_to_sid := KeyToSid,
 teacup@cast(ready, #{ready := false,
                      parent@ := Parent,
                      ref@ := Ref} = State) ->
-    Parent ! {?MSG, teacup:ref(Ref), ready},
+    Parent ! {Ref, ready},
     {noreply, State#{ready => true}};
     
 teacup@cast(ready, State) ->
@@ -170,7 +177,7 @@ interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
         undefined -> ok;
         {_, Pid} ->
             Resp = {msg, Subject, ReplyTo, Payload},
-            Pid ! {?MSG, teacup:ref(Ref), Resp}
+            Pid ! {Ref, Resp}
     end,
     {[], State}.    
     

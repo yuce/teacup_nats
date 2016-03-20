@@ -15,9 +15,9 @@ main(Subjects) ->
 
 loop(Conn) ->
     receive
-        {nats@tc, Conn, {msg, <<"teacup.control">>, _, <<"exit">>}} ->
-            io:format("received exit msg.");
-        {nats@tc, Conn, Msg} ->
+        {Conn, {msg, <<"teacup.control">>, _, <<"exit">>}} ->
+            io:format("received exit msg.~n");
+        {Conn, Msg} ->
             io:format("Received NATS msg: ~p~n", [Msg]),
             loop(Conn);
         Other ->
