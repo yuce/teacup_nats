@@ -53,11 +53,15 @@ teacup@status(connect, State) ->
                       sid_to_key => #{},
                       key_to_sid => #{},
                       ready => false},
+    notify_parent({status, connect}, State),
     {ok, NewState};
     
 teacup@status(disconnect, State) ->
-    % {reconnect, State}.
-    {stop, State}.
+    notify_parent({status, disconnect}, State),
+    {stop, State};
+    
+teacup@status(Status, State) ->
+    notify_parent({status, Status}, State).
     
 teacup@data(Data, #{data_acc := DataAcc} = State) ->
     NewData = <<DataAcc/binary, Data/binary>>,
@@ -69,9 +73,8 @@ teacup@data(Data, #{data_acc := DataAcc} = State) ->
             Other
     end.
     
-teacup@error(Reason, #{parent@ := Parent,
-                       ref@ := Ref} = State) ->
-    Parent ! {Ref, {error, Reason}},
+teacup@error(Reason, State) ->
+    notify_parent({error, Reason}, State),
     {error, Reason, State}.
 
 teacup@cast(ping, #{ready := true} = State) ->
@@ -116,10 +119,8 @@ teacup@cast({unsub, Subject, Opts, Pid}, #{key_to_sid := KeyToSid,
     end,
     {noreply, State};
     
-teacup@cast(ready, #{ready := false,
-                     parent@ := Parent,
-                     ref@ := Ref} = State) ->
-    Parent ! {Ref, ready},
+teacup@cast(ready, #{ready := false} = State) ->
+    notify_parent(ready, State),
     {noreply, State#{ready => true}};
     
 teacup@cast(ready, State) ->
@@ -190,9 +191,8 @@ interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
     end,
     {[], State};
     
-interp_message({err, Reason} = Error, #{ref@ := Ref,
-                                        parent@ := Parent} = State) ->
-    Parent ! {Ref, Error},
+interp_message({err, Reason} = Error, State) ->
+    notify_parent(Error, State),
     case error_disconnect(Reason) of
         true -> throw(disconnect);
         _ -> {[], State}
@@ -205,3 +205,7 @@ client_info(State) ->
     Nats = maps:with([verbose, pedantic, ssl_required, auth_token, user,
                       pass, name, lang, version], State),
     nats_msg:connect(jsx:encode(Nats)).
+    
+notify_parent(What, #{parent@ := Parent,
+                      ref@ := Ref}) ->
+    Parent ! {Ref, What}.                          

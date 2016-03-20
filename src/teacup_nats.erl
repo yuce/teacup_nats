@@ -81,8 +81,6 @@ connect_sync(Host, Port, Opts) ->
     receive
         {Conn, ready} ->
             {ok, Conn}
-    after 1000 ->
-        {error, not_ready}
     end.
 
 -spec ping(Ref :: teacup:teacup_ref()) -> ok.    

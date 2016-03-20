@@ -28,9 +28,11 @@ loop_ready(Conn, Subjects) ->
             NewSubjects = [<<"teacup.*">> | Subjects],
             subscribe(Conn, NewSubjects),
             loop(Conn);
+        {Conn, Msg} ->
+            io:format("Received teacup_nats msg: ~p~n", [Msg]),
+            loop_ready(Conn, Subjects);
         Other ->
-            io:format("Received unexpected msg: ~p~n", [Other]),
-            loop_ready(Conn, Subjects)
+            io:format("Received others msg: ~p~n", [Other])
     after 1000 ->
         throw(cannot_connect)
     end.
