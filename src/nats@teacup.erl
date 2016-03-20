@@ -143,8 +143,8 @@ default_opts() ->
 interp_messages(Messages, State) ->
     F = fun(M, {Rs, S}) ->
         case interp_message(M, S) of
-            {[], NS} -> {Rs, NS};
-            {NR, NS} -> {[NR|Rs], NS}
+            {[], NS} -> {Rs, NS}
+            % {NR, NS} -> {[NR|Rs], NS}
         end
     end,
     try lists:foldl(F, {[], State}, Messages) of
