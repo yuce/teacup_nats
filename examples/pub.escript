@@ -13,4 +13,9 @@ main([Subject, Payload]) ->
     {ok, Conn} = teacup_nats:connect_sync(<<"demo.nats.io">>, 4222),
     BinPayload = list_to_binary(Payload),
     teacup_nats:pub(Conn, Subject, #{payload => BinPayload}),
+    receive
+        AnyMsg -> io:format("Received ~p~n", [AnyMsg])
+    after 1000 ->
+        ok
+    end,
     application:stop(teacup).

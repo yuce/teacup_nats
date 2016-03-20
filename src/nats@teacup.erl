@@ -62,13 +62,17 @@ teacup@status(disconnect, State) ->
 teacup@data(Data, #{data_acc := DataAcc} = State) ->
     NewData = <<DataAcc/binary, Data/binary>>,
     {Messages, Remaining} = nats_msg:decode(NewData),
-    State1 = interp_messages(Messages, State),
-    {ok, State1#{data_acc => Remaining}}.
+    case interp_messages(Messages, State) of
+        {ok, NewState} ->
+            {ok, NewState#{data_acc => Remaining}};
+        Other ->
+            Other
+    end.
     
 teacup@error(Reason, #{parent@ := Parent,
-                       ref@ := Ref}) ->
+                       ref@ := Ref} = State) ->
     Parent ! {Ref, {error, Reason}},
-    {error, Reason}.
+    {error, Reason, State}.
 
 teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
@@ -142,12 +146,17 @@ interp_messages(Messages, State) ->
             {NR, NS} -> {[NR|Rs], NS}
         end
     end,
-    {Response, NewState} = lists:foldl(F, {[], State}, Messages),
-    case Response of
-        [] -> ok;
-        _ -> teacup_server:send(self(), lists:reverse(Response))
-    end,
-    NewState.
+    try lists:foldl(F, {[], State}, Messages) of
+        {Response, NewState} ->
+            case Response of
+                [] -> ok;
+                _ -> teacup_server:send(self(), lists:reverse(Response))
+            end,
+            {ok, NewState}
+    catch
+        throw:disconnect ->
+            {stop, State}
+    end.
 
 % interp_message(ok, State) ->
 %     io:format("Received OK msg~n"),
@@ -179,7 +188,18 @@ interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
             Resp = {msg, Subject, ReplyTo, Payload},
             Pid ! {Ref, Resp}
     end,
-    {[], State}.    
+    {[], State};
+    
+interp_message({err, Reason} = Error, #{ref@ := Ref,
+                                        parent@ := Parent} = State) ->
+    Parent ! {Ref, Error},
+    case error_disconnect(Reason) of
+        true -> throw(disconnect);
+        _ -> {[], State}
+    end.
+    
+error_disconnect(invalid_subject) -> false;
+error_disconnect(_) -> true.
     
 client_info(State) ->
     Nats = maps:with([verbose, pedantic, ssl_required, auth_token, user,
