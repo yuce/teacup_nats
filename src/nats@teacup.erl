@@ -40,7 +40,7 @@
          teacup@info/2]).
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.3.0">>).
+-define(VERSION, <<"0.3.1">>).
 
 %% == Callbacks
     
@@ -55,8 +55,7 @@ teacup@status(connect, State) ->
                       next_sid => 0,
                       sid_to_key => #{},
                       key_to_sid => #{},
-                      ready => false,
-                      from => undefined},
+                      ready => false},
     notify_parent({status, connect}, State),
     {ok, NewState};
     
