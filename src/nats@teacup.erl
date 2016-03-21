@@ -40,7 +40,7 @@
          teacup@info/2]).
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.3.1">>).
+-define(VERSION, <<"0.2.3">>).
 
 %% == Callbacks
     
