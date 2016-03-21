@@ -3,20 +3,21 @@
 %%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/simpre/ebin pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
 
 main([]) ->
-    io:format("Usage: ./sub2.escript subject1 [subject2, ...]~n");
+    io:format("Usage: ./sub_sync.escript subject1 [subject2, ...]~n");
 
 main(Subjects) ->
     application:start(teacup),
-    {ok, Conn} = teacup_nats:connect_sync(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = teacup_nats@sync:connect(<<"demo.nats.io">>, 4222),
     NewSubjects = [<<"teacup.*">> | Subjects],
     subscribe(Conn, NewSubjects),
+    io:format("Subscribed to given subjects.~nSend an `exit` message to subject `teacup.control` to quit.~n"),
     loop(Conn),
     application:stop(teacup).
 
 loop(Conn) ->
     receive
         {Conn, {msg, <<"teacup.control">>, _, <<"exit">>}} ->
-            io:format("received exit msg.~n");
+            io:format("Received exit msg.~n");
         {Conn, Msg} ->
             io:format("Received NATS msg: ~p~n", [Msg]),
             loop(Conn);
@@ -25,4 +26,4 @@ loop(Conn) ->
     end.
     
 subscribe(Conn, Subjects) ->
-    lists:foreach(fun(S) -> teacup_nats:sub(Conn, S) end, Subjects).
+    lists:foreach(fun(S) -> teacup_nats@sync:sub(Conn, S) end, Subjects).

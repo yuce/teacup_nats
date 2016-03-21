@@ -3,19 +3,14 @@
 %%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/simpre/ebin pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
 
 main([]) ->
-    io:format("Usage: ./pub.escript subject [payload]~n");
+    io:format("Usage: ./pub_sync.escript subject [payload]~n");
 
 main([Subject]) ->
     main([Subject, <<>>]);
 
 main([Subject, Payload]) ->
     application:start(teacup),
-    {ok, Conn} = teacup_nats:connect_sync(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = teacup_nats@sync:connect(<<"demo.nats.io">>, 4222),
     BinPayload = list_to_binary(Payload),
-    teacup_nats:pub(Conn, Subject, #{payload => BinPayload}),
-    receive
-        AnyMsg -> io:format("Received ~p~n", [AnyMsg])
-    after 1000 ->
-        ok
-    end,
+    teacup_nats@sync:pub(Conn, Subject, #{payload => BinPayload}),
     application:stop(teacup).

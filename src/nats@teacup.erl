@@ -35,16 +35,19 @@
          teacup@status/2,
          teacup@data/2,
          teacup@error/2,
-         teacup@cast/2]).
+         teacup@call/3,
+         teacup@cast/2,
+         teacup@info/2]).
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.2.3">>).
+-define(VERSION, <<"0.3.0">>).
 
 %% == Callbacks
     
 teacup@init(Opts) ->
     NewOpts = maps:merge(default_opts(), Opts),
-    {ok, NewOpts#{ready => false}}.
+    {ok, NewOpts#{ready => false,
+                  from => undefined}}.
     
 teacup@status(connect, State) ->
     NewState = State#{data_acc => <<>>,
@@ -52,7 +55,8 @@ teacup@status(connect, State) ->
                       next_sid => 0,
                       sid_to_key => #{},
                       key_to_sid => #{},
-                      ready => false},
+                      ready => false,
+                      from => undefined},
     notify_parent({status, connect}, State),
     {ok, NewState};
     
@@ -77,54 +81,50 @@ teacup@error(Reason, State) ->
     notify_parent({error, Reason}, State),
     {error, Reason, State}.
 
+teacup@call({connect, Host, Port}, From, State) ->
+    NewState = do_connect(Host, Port, State#{from => From}),
+    {noreply, NewState};
+
+teacup@call({pub, Subject, Opts}, From, State) ->
+    NewState = do_pub(Subject, Opts, State#{from := From}),
+    {noreply, NewState};
+    
+teacup@call({sub, Subject, Opts, Pid}, From, State) ->
+    NewState = do_sub(Subject, Opts, Pid, State#{from := From}),
+    {noreply, NewState};    
+
+teacup@call({unsub, Subject, Opts, Pid}, From, State) ->
+    NewState = do_unsub(Subject, Opts, Pid, State#{from := From}),
+    {noreply, NewState}.
+
+teacup@cast({connect, Host, Port}, State) ->
+    NewState = do_connect(Host, Port, State),
+    {noreply, NewState};
+    
 teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
     {noreply, State};
     
 teacup@cast({pub, Subject, Opts},
             #{ready := true} = State) ->
-    ReplyTo = maps:get(reply_to, Opts, undefined),
-    Payload = maps:get(payload, Opts, <<>>),
-    BinMsg = nats_msg:pub(Subject, ReplyTo, Payload),
-    teacup_server:send(self(), BinMsg),
-    {noreply, State};
-    
-teacup@cast({sub, Subject, Opts, Pid}, #{next_sid := DefaultSid,
-                                         sid_to_key := SidToKey,
-                                         key_to_sid := KeyToSid,
-                                         ready := true} = State) ->
-    K = {Subject, Pid},
-    Sid = maps:get(K, KeyToSid, integer_to_binary(DefaultSid)),
-    NewKeyToSid = maps:put(K, Sid, KeyToSid),
-    NewSidToKey = maps:put(Sid, K, SidToKey),
-    QueueGrp = maps:get(queue_group, Opts, undefined),
-    BinMsg = nats_msg:sub(Subject, QueueGrp, Sid),
-    teacup_server:send(self(), BinMsg),
-    NewState = State#{next_sid => DefaultSid + 1,
-                      sid_to_key => NewSidToKey,
-                      key_to_sid => NewKeyToSid},
+    NewState = do_pub(Subject, Opts, State),
     {noreply, NewState};
     
-teacup@cast({unsub, Subject, Opts, Pid}, #{key_to_sid := KeyToSid,
-                                           ready := true} = State) ->
-    % Should we crash if Sid for Pid not found?
-    Sid = maps:get({Subject, Pid}, KeyToSid, undefined),
-    case Sid of
-        undefined ->
-            ok;
-        _ ->
-            MaxMsgs = maps:get(max_messages, Opts, undefined),
-            BinMsg = nats_msg:unsub(Sid, MaxMsgs),
-            teacup_server:send(self(), BinMsg)
-    end,
-    {noreply, State};
+teacup@cast({sub, Subject, Opts, Pid}, State) ->
+    NewState = do_sub(Subject, Opts, Pid, State),
+    {noreply, NewState};
     
-teacup@cast(ready, #{ready := false} = State) ->
+teacup@cast({unsub, Subject, Opts, Pid}, State) ->
+    NewState = do_unsub(Subject, Opts, Pid, State),
+    {noreply, NewState}.
+
+teacup@info(ready, #{ready := false,
+                     from := undefined} = State) ->
     notify_parent(ready, State),
     {noreply, State#{ready => true}};
     
-teacup@cast(ready, State) ->
-    % Ignore ready messages received after the first
+teacup@info(ready, State) ->
+    % Ignore other ready messages
     {noreply, State}.
 
 %% == Internal
@@ -159,10 +159,6 @@ interp_messages(Messages, State) ->
             {stop, State}
     end.
 
-% interp_message(ok, State) ->
-%     io:format("Received OK msg~n"),
-%     {[], State};
-
 interp_message(ping, State) ->
     % Send pong messages immediately
     teacup_server:send(self(), nats_msg:pong()),
@@ -172,12 +168,15 @@ interp_message(pong, State) ->
     % TODO: reset ping timer
     {[], State};
     
-interp_message({info, BinInfo}, State) ->
+interp_message({info, BinInfo}, #{from := From} = State) ->
     % Send connect messages immediately
     Info = jsx:decode(BinInfo, [return_maps]),
     NewState = State#{server_info => Info},
     teacup_server:send(self(), client_info(NewState)),
-    teacup_server:cast(self(), ready),
+    case From of
+        undefined -> self() ! ready;
+        _ -> ok
+    end,
     {[], NewState};
     
 interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
@@ -190,6 +189,17 @@ interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
             Pid ! {Ref, Resp}
     end,
     {[], State};
+
+interp_message(ok, #{from := From} = State)
+        when From /= undefined ->
+    gen_server:reply(From, ok),
+    {[], State#{from => undefined,
+                ready => true}};
+
+interp_message({err, Reason}, #{from := From} = State)
+        when From /= undefined ->
+    gen_server:reply(From, {error, Reason}),
+    {[], State#{from => undefined}};
     
 interp_message({err, Reason} = Error, State) ->
     notify_parent(Error, State),
@@ -209,3 +219,43 @@ client_info(State) ->
 notify_parent(What, #{parent@ := Parent,
                       ref@ := Ref}) ->
     Parent ! {Ref, What}.                          
+
+do_connect(Host, Port, #{ref@ := Ref} = State) ->
+    teacup:connect(Ref, Host, Port),
+    State.    
+
+do_pub(Subject, Opts, State) ->
+    ReplyTo = maps:get(reply_to, Opts, undefined),
+    Payload = maps:get(payload, Opts, <<>>),
+    BinMsg = nats_msg:pub(Subject, ReplyTo, Payload),
+    teacup_server:send(self(), BinMsg),
+    State.
+
+do_sub(Subject, Opts, Pid, #{next_sid := DefaultSid,
+                             sid_to_key := SidToKey,
+                             key_to_sid := KeyToSid,
+                             ready := true} = State) ->
+    K = {Subject, Pid},
+    Sid = maps:get(K, KeyToSid, integer_to_binary(DefaultSid)),
+    NewKeyToSid = maps:put(K, Sid, KeyToSid),
+    NewSidToKey = maps:put(Sid, K, SidToKey),
+    QueueGrp = maps:get(queue_group, Opts, undefined),
+    BinMsg = nats_msg:sub(Subject, QueueGrp, Sid),
+    teacup_server:send(self(), BinMsg),
+    State#{next_sid => DefaultSid + 1,
+           sid_to_key => NewSidToKey,
+           key_to_sid => NewKeyToSid}.
+
+do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid,
+                               ready := true} = State) ->
+    % Should we crash if Sid for Pid not found?
+    Sid = maps:get({Subject, Pid}, KeyToSid, undefined),
+    case Sid of
+        undefined ->
+            ok;
+        _ ->
+            MaxMsgs = maps:get(max_messages, Opts, undefined),
+            BinMsg = nats_msg:unsub(Sid, MaxMsgs),
+            teacup_server:send(self(), BinMsg)
+    end,
+    State.

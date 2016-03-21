@@ -7,7 +7,7 @@ main([]) ->
 
 main(Subjects) ->
     application:start(teacup),
-    {ok, Conn} = teacup_nats:connect(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = teacup_nats:connect(<<"127.0.0.1">>, 4222),
     loop_ready(Conn, Subjects),
     application:stop(teacup).
 
