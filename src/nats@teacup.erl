@@ -38,7 +38,7 @@
          teacup@cast/2]).
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.1.0">>).
+-define(VERSION, <<"0.2.3">>).
 
 %% == Callbacks
     
