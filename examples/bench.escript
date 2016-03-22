@@ -1,7 +1,7 @@
 #! /usr/bin/env escript
 %%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/simpre/ebin pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
 
-%%% Example, run 20 publishers, 10 subscribers, 10000 messages with subject: hello and payload: world per publisher
+%%% Example, run 10 publishers, 5 subscribers, 10000 messages with subject: hello and payload: world per publisher
 %%% escript examples/bench.escript 127.0.0.1:4222 10 5 10000 hello world
 
 main([HostPort, Pubs, Subs, StrPublishCount, Subject, Payload]) ->
