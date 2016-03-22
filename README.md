@@ -52,7 +52,7 @@ $ rebar3 shell --apps teacup
     * `teacup_nats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
     the subject,
     * `teacup_nats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
-    the subject and options. Valid options:
+    the subject with `Options`. Valid options:
         * `payload => Payload :: binary()`,
         * `reply_to => Subject :: binary()`
 * Subscribe functions:
@@ -81,8 +81,7 @@ ready_loop(Conn) ->
         {Conn, ready} ->
             % It's OK to use the connection now
             % Publish some message
-            teacup_nats:pub(Conn, <<"teacup.control">>,
-                            #{payload => <<"start">>}),
+            teacup_nats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
             % subscribe to some subject
             teacup_nats:sub(Conn, <<"foo.*">>),
             loop(Conn)
@@ -90,7 +89,7 @@ ready_loop(Conn) ->
 
 loop(Conn) ->
     receive
-        {Conn, {msg, Subject, ReplyTo, Payload}} ->
+        {Conn, {msg, Subject, _ReplyTo, Payload}} ->
             % Do something with the received message
             io:format("~p: ~p~n", [Subject, Payload]),
             loop(Conn)
@@ -100,7 +99,31 @@ loop(Conn) ->
 
 ### Synchronous Connection
 
-Synchronous functions use the same signature, except their namespace is `teacup_nats@sync` instead of `teacup_nats`.
+Synchronous functions use the same signature as the corresponding asynchronous funcitons,
+but their namespace is `teacup_nats@sync` instead of `teacup_nats`.
+
+#### Sample
+
+```erlang
+main() ->
+    % Connect to the NATS server
+    {ok, Conn} = teacup_nats@sync:connect(<<"demo.nats.io">>, 4222),
+    % The connection is OK to use
+    % Publish some message
+    ok = teacup_nats@sync:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
+    % subscribe to some subject
+    ok = teacup_nats@sync:sub(Conn, <<"foo.*">>),
+    loop(Conn).
+
+loop(Conn) ->
+    receive
+        {Conn, {msg, Subject, _ReplyTo, Payload}} ->
+            % Do something with the received message
+            io:format("~p: ~p~n", [Subject, Payload]),
+            loop(Conn)
+    end.
+
+```
 
 ## License
 
