@@ -1,7 +1,7 @@
 #! /usr/bin/env escript
 %%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/simpre/ebin pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
 
-%%% Example, run 20 publishers, 10 subscribers, 10000 messages with subject: hello and payload: world per publisher 
+%%% Example, run 20 publishers, 10 subscribers, 10000 messages with subject: hello and payload: world per publisher
 %%% escript examples/bench.escript 127.0.0.1:4222 10 5 10000 hello world
 
 main([HostPort, Pubs, Subs, StrPublishCount, Subject, Payload]) ->
@@ -18,9 +18,9 @@ main([HostPort, Pubs, Subs, StrPublishCount, Subject, Payload]) ->
     application:start(teacup),
     start_bench(BinHost, Port, NPubs, NSubs, PublishCount, BinSubject, BinPayload),
     application:stop(teacup);
-    
+
 main([]) ->
-    io:format("Usage: ./bench.escript host:port num_publishers num_subscribers messages_per_publisher subject payload~n").    
+    io:format("Usage: ./bench.escript host:port num_publishers num_subscribers messages_per_publisher subject payload~n").
 
 start_bench(Host, Port, NPubs, NSubs, PublishCount, Subject, Payload) ->
     io:format("Spawning subscribers...~n"),
@@ -35,22 +35,22 @@ start_bench(Host, Port, NPubs, NSubs, PublishCount, Subject, Payload) ->
         true -> NPubs * PublishCount * NSubs;
         _ -> NPubs * PublishCount
     end,
-    loop(NSubs, Tic, 0, NPubs * MsgCount).
-    
+    loop(NSubs, Tic, 0, MsgCount).
+
 subscribers(Parent, Host, Port, NSubs, Subject, PublishCount) ->
     Connect = fun() ->
         {ok, Conn} = teacup_nats:connect(Host, Port),
         subscriber_ready_loop(Parent, Conn, Subject, PublishCount)
     end,
     lists:map(fun(_) -> spawn(Connect) end, lists:seq(1, NSubs)).
-    
+
 publishers(Parent, Host, Port, NPubs, PublishCount, Subject, Payload) ->
     Connect = fun() ->
         {ok, Conn} = teacup_nats:connect(Host, Port),
         publisher_ready_loop(Parent, Conn, PublishCount, Subject, Payload)
     end,
     lists:map(fun(_) -> spawn(Connect) end, lists:seq(1, NPubs)).
-                
+
 loop(NSubs, Tic, CompletedSubs, MsgCount) ->
     io:format("Subscriber ~p / ~p~n", [CompletedSubs, NSubs]),
     case NSubs == CompletedSubs of
@@ -68,7 +68,7 @@ loop(NSubs, Tic, CompletedSubs, MsgCount) ->
                     ok
             end
     end.
-            
+
 subscriber_ready_loop(Parent, Conn, Subject, PublishCount) ->
     receive
         {Conn, ready} ->
@@ -78,7 +78,7 @@ subscriber_ready_loop(Parent, Conn, Subject, PublishCount) ->
         _Other ->
             subscriber_ready_loop(Parent, Conn, Subject, PublishCount)
     end.
-    
+
 subscriber_loop(Parent, Conn, Subject, PublishCount, MsgCount) ->
     case PublishCount == MsgCount of
         true ->
@@ -99,7 +99,7 @@ publisher_ready_loop(Parent, Conn, PublishCount, Subject, Payload) ->
             publisher_wait_loop(Conn, PublishCount, Subject, Payload);
         _Other ->
             publisher_ready_loop(Parent, Conn, PublishCount, Subject, Payload)
-    end.    
+    end.
 
 publisher_wait_loop(Conn, PublishCount, Subject, Payload) ->
     F = fun(_I) ->
@@ -124,7 +124,7 @@ wait_for_subscribers(NSubs, ReadySubs) ->
                     wait_for_subscribers(NSubs, ReadySubs)
             end
     end.
-                    
+
 wait_for_publishers(NPubs, ReadyPubs) ->
     case NPubs == ReadyPubs of
         true ->
@@ -137,4 +137,3 @@ wait_for_publishers(NPubs, ReadyPubs) ->
                     wait_for_publishers(NPubs, ReadyPubs)
             end
     end.
-                
