@@ -1,10 +1,106 @@
 # teacup_nats
 
-Teacup based NATS Client for Erlang
+A [Teacup](https://github.com/yuce/teacup.git) based [NATS](http://nats.io/) client for Erlang.
 
-## Build
+## Install
 
-    $ rebar3 compile
+**teacup_nats** requires Erlang/OTP 18.0+. It uses [rebar3](http://www.rebar3.org/)
+as the build tool and is available on [hex.pm](https://hex.pm/). Just include the following
+in your `rebar.config`:
+
+```erlang
+{deps, [teacup_nats]}.
+```
+
+## Usage
+
+**teacup_nats** depends on the `teacup` app to be started. Include it in your `.app.src` file:
+
+```erlang
+...
+  {applications,
+   [kernel,
+    stdlib,
+    teacup
+   ]},
+...
+```
+
+Or, start it manually:
+
+```erlang
+ok = application:start(teacup).
+```
+
+**rebar3** has a nice way of starting apps in the shell, you can try:
+
+```
+$ rebar3 shell --apps teacup
+```
+
+### Aysnchronous Connection
+
+* Connection functions:
+    * `teacup_nats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
+    * `teacup_nats:connect(Host :: binary(), Port :: integer())`: Connect to the NATS server
+    at `Host` and port `PORT`,
+    * `teacup_nats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
+    above, but also takes an `Opts` map. Currently usable keys:
+        * `user => User :: binary()`,
+        * `pass => Password :: binary()`
+* Publish functions:
+    * `teacup_nats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
+    the subject,
+    * `teacup_nats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
+    the subject and options. Valid options:
+        * `payload => Payload :: binary()`,
+        * `reply_to => Subject :: binary()`
+* Subscribe functions:
+    * `teacup_nats:sub(Conn :: teacup_ref(), Subject :: binary())`: Subscribe to the `Subject`,
+    * `teacup_nats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Subscribe to the `Subject`, with
+    `Options`. Valid options:
+        * `queue_group => QGroup :: binary()`
+* Unsubscribe functions:
+    * `teacup_nats:unsub(Conn :: teacup_ref(), Subject :: binary())`: Unsubscribe from `Subject`,
+    * `teacup_nats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
+    `Options`. Valid options:
+        * `max_messages => MaxMessages :: integer()`: Automatically unsubscribe after receiving `MaxMessages`.
+
+
+#### Sample
+
+```erlang
+main() ->
+    % Connect to the NATS server
+    {ok, Conn} = teacup_nats:connect(<<"demo.nats.io">>, 4222),
+    % When the connection is OK to use, a `ready` message is sent, wait for it
+    ready_loop(Conn).
+
+ready_loop(Conn) ->
+    receive
+        {Conn, ready} ->
+            % It's OK to use the connection now
+            % Publish some message
+            teacup_nats:pub(Conn, <<"teacup.control">>,
+                            #{payload => <<"start">>}),
+            % subscribe to some subject
+            teacup_nats:sub(Conn, <<"foo.*">>),
+            loop(Conn)
+    end.
+
+loop(Conn) ->
+    receive
+        {Conn, {msg, Subject, ReplyTo, Payload}} ->
+            % Do something with the received message
+            io:format("~p: ~p~n", [Subject, Payload]),
+            loop(Conn)
+    end.
+```
+
+
+### Synchronous Connection
+
+Synchronous functions use the same signature, except their namespace is `teacup_nats@sync` instead of `teacup_nats`.
 
 ## License
 
