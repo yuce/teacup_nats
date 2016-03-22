@@ -1,6 +1,7 @@
 # teacup_nats
 
-A [Teacup](https://github.com/yuce/teacup.git) based [NATS](http://nats.io/) client for Erlang.
+A [Teacup](https://github.com/yuce/teacup.git) based Erlang client library for [NATS](http://nats.io/)
+high performance messaging platform.
 
 ## Getting Started
 
@@ -35,6 +36,12 @@ ok = application:start(teacup).
 ```
 $ rebar3 shell --apps teacup
 ```
+
+## TODO
+
+* Clustering
+* TLS transport support
+
 
 ## API
 
