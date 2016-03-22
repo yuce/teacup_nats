@@ -4,6 +4,8 @@
 %%% Example, run 10 publishers, 5 subscribers, 10000 messages with subject: hello and payload: world per publisher
 %%% escript examples/bench.escript 127.0.0.1:4222 10 5 10000 hello world
 
+-mode(compile).
+
 main([HostPort, Pubs, Subs, StrPublishCount, Subject, Payload]) ->
     [Host, StrPort] = string:tokens(HostPort, ":"),
     BinHost = list_to_binary(Host),
