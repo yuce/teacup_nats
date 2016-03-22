@@ -2,7 +2,7 @@
 
 A [Teacup](https://github.com/yuce/teacup.git) based [NATS](http://nats.io/) client for Erlang.
 
-## Install
+## Getting Started
 
 **teacup_nats** requires Erlang/OTP 18.0+. It uses [rebar3](http://www.rebar3.org/)
 as the build tool and is available on [hex.pm](https://hex.pm/). Just include the following
@@ -11,8 +11,6 @@ in your `rebar.config`:
 ```erlang
 {deps, [teacup_nats]}.
 ```
-
-## Usage
 
 **teacup_nats** depends on the `teacup` app to be started. Include it in your `.app.src` file:
 
@@ -38,7 +36,12 @@ ok = application:start(teacup).
 $ rebar3 shell --apps teacup
 ```
 
+## API
+
 ### Aysnchronous Connection
+
+When using asycnhronous connections, you need to wait for a `{Conn, ready}`
+message before publishing messages, subcribing to/unsubscribing from subjects.
 
 * Connection functions:
     * `teacup_nats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
@@ -65,7 +68,6 @@ $ rebar3 shell --apps teacup
     * `teacup_nats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
     `Options`. Valid options:
         * `max_messages => MaxMessages :: integer()`: Automatically unsubscribe after receiving `MaxMessages`.
-
 
 #### Sample
 
@@ -96,11 +98,13 @@ loop(Conn) ->
     end.
 ```
 
-
 ### Synchronous Connection
 
 Synchronous functions use the same signature as the corresponding asynchronous funcitons,
 but their namespace is `teacup_nats@sync` instead of `teacup_nats`.
+
+Connect, publish, subscribe and unsubscribe operations block and return either `ok` on
+success or `{error, Reason :: term()}` on failure.
 
 #### Sample
 
