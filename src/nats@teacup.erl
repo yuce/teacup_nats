@@ -43,13 +43,14 @@
 -define(VERSION, <<"0.2.3">>).
 
 %% == Callbacks
-    
+
 teacup@init(Opts) ->
     NewOpts = maps:merge(default_opts(), Opts),
     {ok, NewOpts#{ready => false,
                   from => undefined}}.
-    
+
 teacup@status(connect, State) ->
+    nats_msg:init(),
     NewState = State#{data_acc => <<>>,
                       server_info => #{},
                       next_sid => 0,
@@ -58,24 +59,24 @@ teacup@status(connect, State) ->
                       ready => false},
     notify_parent({status, connect}, State),
     {ok, NewState};
-    
+
 teacup@status(disconnect, State) ->
     notify_parent({status, disconnect}, State),
     {stop, State};
-    
+
 teacup@status(Status, State) ->
     notify_parent({status, Status}, State).
-    
+
 teacup@data(Data, #{data_acc := DataAcc} = State) ->
     NewData = <<DataAcc/binary, Data/binary>>,
-    {Messages, Remaining} = nats_msg:decode(NewData),
+    {Messages, Remaining} = nats_msg:decode_all(NewData),
     case interp_messages(Messages, State) of
         {ok, NewState} ->
             {ok, NewState#{data_acc => Remaining}};
         Other ->
             Other
     end.
-    
+
 teacup@error(Reason, State) ->
     notify_parent({error, Reason}, State),
     {error, Reason, State}.
@@ -87,10 +88,10 @@ teacup@call({connect, Host, Port}, From, State) ->
 teacup@call({pub, Subject, Opts}, From, State) ->
     NewState = do_pub(Subject, Opts, State#{from := From}),
     {noreply, NewState};
-    
+
 teacup@call({sub, Subject, Opts, Pid}, From, State) ->
     NewState = do_sub(Subject, Opts, Pid, State#{from := From}),
-    {noreply, NewState};    
+    {noreply, NewState};
 
 teacup@call({unsub, Subject, Opts, Pid}, From, State) ->
     NewState = do_unsub(Subject, Opts, Pid, State#{from := From}),
@@ -99,20 +100,20 @@ teacup@call({unsub, Subject, Opts, Pid}, From, State) ->
 teacup@cast({connect, Host, Port}, State) ->
     NewState = do_connect(Host, Port, State),
     {noreply, NewState};
-    
+
 teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
     {noreply, State};
-    
+
 teacup@cast({pub, Subject, Opts},
             #{ready := true} = State) ->
     NewState = do_pub(Subject, Opts, State),
     {noreply, NewState};
-    
+
 teacup@cast({sub, Subject, Opts, Pid}, State) ->
     NewState = do_sub(Subject, Opts, Pid, State),
     {noreply, NewState};
-    
+
 teacup@cast({unsub, Subject, Opts, Pid}, State) ->
     NewState = do_unsub(Subject, Opts, Pid, State),
     {noreply, NewState}.
@@ -121,7 +122,7 @@ teacup@info(ready, #{ready := false,
                      from := undefined} = State) ->
     notify_parent(ready, State),
     {noreply, State#{ready => true}};
-    
+
 teacup@info(ready, State) ->
     % Ignore other ready messages
     {noreply, State}.
@@ -138,7 +139,7 @@ default_opts() ->
       name => <<"teacup_nats">>,
       lang => <<"erlang">>,
       version => ?VERSION}.
-    
+
 interp_messages(Messages, State) ->
     F = fun(M, {Rs, S}) ->
         case interp_message(M, S) of
@@ -158,6 +159,9 @@ interp_messages(Messages, State) ->
             {stop, State}
     end.
 
+interp_message([], State) ->
+    {[], State};
+
 interp_message(ping, State) ->
     % Send pong messages immediately
     teacup_server:send(self(), nats_msg:pong()),
@@ -166,7 +170,7 @@ interp_message(ping, State) ->
 interp_message(pong, State) ->
     % TODO: reset ping timer
     {[], State};
-    
+
 interp_message({info, BinInfo}, #{from := From} = State) ->
     % Send connect messages immediately
     Info = jsx:decode(BinInfo, [return_maps]),
@@ -177,8 +181,8 @@ interp_message({info, BinInfo}, #{from := From} = State) ->
         _ -> ok
     end,
     {[], NewState};
-    
-interp_message({msg, {Subject, Sid, ReplyTo, _PayloadSize}, Payload},
+
+interp_message({msg, {Subject, Sid, ReplyTo, Payload}},
                #{ref@ := Ref,
                  sid_to_key := SidToKey} = State) ->
     case maps:get(Sid, SidToKey, undefined) of
@@ -195,33 +199,33 @@ interp_message(ok, #{from := From} = State)
     {[], State#{from => undefined,
                 ready => true}};
 
-interp_message({err, Reason}, #{from := From} = State)
+interp_message({error, Reason}, #{from := From} = State)
         when From /= undefined ->
     gen_server:reply(From, {error, Reason}),
     {[], State#{from => undefined}};
-    
-interp_message({err, Reason} = Error, State) ->
+
+interp_message({error, Reason} = Error, State) ->
     notify_parent(Error, State),
     case error_disconnect(Reason) of
         true -> throw(disconnect);
         _ -> {[], State}
     end.
-    
+
 error_disconnect(invalid_subject) -> false;
 error_disconnect(_) -> true.
-    
+
 client_info(State) ->
     Nats = maps:with([verbose, pedantic, ssl_required, auth_token, user,
                       pass, name, lang, version], State),
     nats_msg:connect(jsx:encode(Nats)).
-    
+
 notify_parent(What, #{parent@ := Parent,
                       ref@ := Ref}) ->
-    Parent ! {Ref, What}.                          
+    Parent ! {Ref, What}.
 
 do_connect(Host, Port, #{ref@ := Ref} = State) ->
     teacup:connect(Ref, Host, Port),
-    State.    
+    State.
 
 do_pub(Subject, Opts, State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),
