@@ -40,7 +40,8 @@
          teacup@info/2]).
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.2.3">>).
+-define(VERSION, <<"0.3.0">>).
+-define(PUBLISH_TIMEOUT, 10).
 
 %% == Callbacks
 
@@ -56,13 +57,15 @@ teacup@status(connect, State) ->
                       next_sid => 0,
                       sid_to_key => #{},
                       key_to_sid => #{},
-                      ready => false},
+                      ready => false,
+                      pub_batch => [],
+                      pub_timer => undefined},
     notify_parent({status, connect}, State),
-    {ok, NewState};
+    {noreply, NewState};
 
-teacup@status(disconnect, State) ->
+teacup@status({disconnect, _}, State) ->
     notify_parent({status, disconnect}, State),
-    {stop, State};
+    {stop, normal, State};
 
 teacup@status(Status, State) ->
     notify_parent({status, Status}, State).
@@ -71,15 +74,15 @@ teacup@data(Data, #{data_acc := DataAcc} = State) ->
     NewData = <<DataAcc/binary, Data/binary>>,
     {Messages, Remaining} = nats_msg:decode_all(NewData),
     case interp_messages(Messages, State) of
-        {ok, NewState} ->
-            {ok, NewState#{data_acc => Remaining}};
+        {noreply, NewState} ->
+            {noreply, NewState#{data_acc => Remaining}};
         Other ->
             Other
     end.
 
 teacup@error(Reason, State) ->
     notify_parent({error, Reason}, State),
-    {error, Reason, State}.
+    {stop, Reason, State}.
 
 teacup@call({connect, Host, Port}, From, State) ->
     NewState = do_connect(Host, Port, State#{from => From}),
@@ -110,6 +113,11 @@ teacup@cast({pub, Subject, Opts},
     NewState = do_pub(Subject, Opts, State),
     {noreply, NewState};
 
+teacup@cast({pub_batch, Batch},
+            #{ready := true} = State) ->
+    NewState = do_pub_batch(Batch, State),
+    {noreply, NewState};
+
 teacup@cast({sub, Subject, Opts, Pid}, State) ->
     NewState = do_sub(Subject, Opts, Pid, State),
     {noreply, NewState};
@@ -125,7 +133,18 @@ teacup@info(ready, #{ready := false,
 
 teacup@info(ready, State) ->
     % Ignore other ready messages
-    {noreply, State}.
+    {noreply, State};
+    
+teacup@info(publish_timeout, #{pub_batch := PubBatch} = State) ->
+    PubTimer = case PubBatch of
+        [] ->
+            undefined;
+        _ ->            
+            teacup_server:send(self(), lists:reverse(PubBatch)),
+            erlang:send_after(?PUBLISH_TIMEOUT, self(), publish_timeout)
+    end,
+    {noreply, State#{pub_batch => [],
+                     pub_timer => PubTimer}}.
 
 %% == Internal
 
@@ -153,10 +172,10 @@ interp_messages(Messages, State) ->
                 [] -> ok;
                 _ -> teacup_server:send(self(), lists:reverse(Response))
             end,
-            {ok, NewState}
+            {noreply, NewState}
     catch
         throw:disconnect ->
-            {stop, State}
+            {stop, normal, State}
     end.
 
 interp_message([], State) ->
@@ -227,11 +246,30 @@ do_connect(Host, Port, #{ref@ := Ref} = State) ->
     teacup:connect(Ref, Host, Port),
     State.
 
-do_pub(Subject, Opts, State) ->
+do_pub(Subject, Opts, #{pub_batch := PubBatch,
+                        pub_timer := PubTimer} = State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),
     Payload = maps:get(payload, Opts, <<>>),
     BinMsg = nats_msg:pub(Subject, ReplyTo, Payload),
-    teacup_server:send(self(), BinMsg),
+    NewState = State#{pub_batch => [BinMsg | PubBatch]},
+    case PubTimer of
+        undefined ->
+            NewPubTimer = erlang:send_after(?PUBLISH_TIMEOUT,
+                                            self(),
+                                            publish_timeout),
+            NewState#{pub_timer => NewPubTimer};
+        _ ->
+            NewState
+    end.
+
+do_pub_batch(Batch, State) ->
+    F = fun({Subject, Opts}) ->
+        ReplyTo = maps:get(reply_to, Opts, undefined),
+        Payload = maps:get(payload, Opts, <<>>),
+        nats_msg:pub(Subject, ReplyTo, Payload)
+    end,
+    BinBatch = lists:map(F, Batch),
+    teacup_server:send(self(), BinBatch),
     State.
 
 do_sub(Subject, Opts, Pid, #{next_sid := DefaultSid,

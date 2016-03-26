@@ -37,6 +37,7 @@
          connect/3,
          pub/2,
          pub/3,
+         pub_batch/2,
          sub/2,
          sub/3,
          unsub/2,
@@ -63,7 +64,7 @@ connect(Host, Port) ->
 connect(Host, Port, Opts) ->
     NewOpts = Opts#{verbose => false},
     {ok, Conn} = teacup:new(?HANDLER, NewOpts),
-    teacup:cast(Conn, {connect, Host, Port}),
+    teacup:connect(Conn, Host, Port),
     {ok, Conn}.
     
 pub(Ref, Subject) ->
@@ -73,6 +74,9 @@ pub(Ref, Subject) ->
     ok.
 pub(Ref, Subject, Opts) ->
     teacup:cast(Ref, {pub, Subject, Opts}).                        
+
+pub_batch(Ref, Batch) ->
+    teacup:cast(Ref, {pub_batch, Batch}).
 
 sub(Ref, Subject) ->
     sub(Ref, Subject, #{}).

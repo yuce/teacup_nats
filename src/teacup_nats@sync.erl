@@ -64,8 +64,10 @@ connect(Host, Port, Opts) ->
     NewOpts = Opts#{verbose => true},
     {ok, Conn} = teacup:new(?HANDLER, NewOpts),
     case teacup:call(Conn, {connect, Host, Port}) of
-        ok -> {ok, Conn};
-        {error, _Reason} = Error -> Error
+        ok ->
+            {ok, Conn};
+        {error, _Reason} = Error ->
+            Error
     end.
 
 pub(Ref, Subject) ->
