@@ -27,7 +27,7 @@ prepare_bench(Host, Port, PublishCount, Subject, Payload) ->
     end,
     {Time, ok} = timer:tc(F),
      io:format("Took: ~p microsecs to pub/sub ~p messages~n", [Time, PublishCount]),
-     MsgsPerSec = PublishCount / (Time / 1000000),
+     MsgsPerSec = round(PublishCount / (Time / 1000000)),
      io:format("~p messages per second~n", [MsgsPerSec]).
     
 create_conns(Host, Port) ->
