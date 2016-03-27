@@ -40,7 +40,7 @@
          teacup@info/2]).
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.3.0">>).
+-define(VERSION, <<"0.3.1">>).
 -define(PUBLISH_TIMEOUT, 10).
 
 %% == Callbacks
@@ -134,12 +134,12 @@ teacup@info(ready, #{ready := false,
 teacup@info(ready, State) ->
     % Ignore other ready messages
     {noreply, State};
-    
+
 teacup@info(publish_timeout, #{pub_batch := PubBatch} = State) ->
     PubTimer = case PubBatch of
         [] ->
             undefined;
-        _ ->            
+        _ ->
             teacup_server:send(self(), lists:reverse(PubBatch)),
             erlang:send_after(?PUBLISH_TIMEOUT, self(), publish_timeout)
     end,
@@ -233,9 +233,14 @@ interp_message({error, Reason} = Error, State) ->
 error_disconnect(invalid_subject) -> false;
 error_disconnect(_) -> true.
 
-client_info(State) ->
-    Nats = maps:with([verbose, pedantic, ssl_required, auth_token, user,
-                      pass, name, lang, version], State),
+client_info(#{server_info := ServerInfo} = State) ->
+    % Include user and name iff the server requires it
+    FieldsList = [verbose, pedantic, ssl_required, auth_token, name, lang, version],
+    NewFieldsList = case maps:get(<<"auth_required">>, ServerInfo, false) of
+        true -> [user, pass | FieldsList];
+        _ -> FieldsList
+    end,
+    Nats = maps:with(NewFieldsList, State),
     nats_msg:connect(jsx:encode(Nats)).
 
 notify_parent(What, #{parent@ := Parent,
