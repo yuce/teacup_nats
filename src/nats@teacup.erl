@@ -31,7 +31,8 @@
 -module(nats@teacup).
 -behaviour(teacup_server).
 
--export([teacup@init/1,
+-export([teacup@signature/1,
+         teacup@init/1,
          teacup@status/2,
          teacup@data/2,
          teacup@error/2,
@@ -39,11 +40,20 @@
          teacup@cast/2,
          teacup@info/2]).
 
+
+-include("teacup_nats_common.hrl").
+
 -define(MSG, ?MODULE).
 -define(VERSION, <<"0.3.1">>).
 -define(PUBLISH_TIMEOUT, 10).
 
 %% == Callbacks
+
+teacup@signature(#{verbose := true}) ->
+    {ok, ?VERBOSE_SIGNATURE};
+
+teacup@signature(_) ->
+    {ok, ?SIGNATURE}.
 
 teacup@init(Opts) ->
     NewOpts = maps:merge(default_opts(), Opts),
