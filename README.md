@@ -56,6 +56,7 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
     at `Host` and port `PORT`,
     * `tcnats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
     above, but also takes an `Opts` map. Currently usable keys:
+        * `verbose => true | false`,
         * `user => User :: binary()`,
         * `pass => Password :: binary()`
 * Publish functions:
@@ -107,8 +108,7 @@ loop(Conn) ->
 
 ### Synchronous Connection
 
-Synchronous functions use the same signature as the corresponding asynchronous funcitons,
-but their namespace is `tcnats@sync` instead of `tcnats`.
+In order to activate the synchronous mode, just pass `#{verbose => true` to `tcnats:connect`.
 
 Connect, publish, subscribe and unsubscribe operations block and return either `ok` on
 success or `{error, Reason :: term()}` on failure.
@@ -118,12 +118,12 @@ success or `{error, Reason :: term()}` on failure.
 ```erlang
 main() ->
     % Connect to the NATS server
-    {ok, Conn} = tcnats@sync:connect(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
     % The connection is OK to use
     % Publish some message
-    ok = tcnats@sync:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
+    ok = tcnats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
     % subscribe to some subject
-    ok = tcnats@sync:sub(Conn, <<"foo.*">>),
+    ok = tcnats:sub(Conn, <<"foo.*">>),
     loop(Conn).
 
 loop(Conn) ->

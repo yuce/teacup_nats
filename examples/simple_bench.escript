@@ -31,7 +31,7 @@ prepare_bench(Host, Port, PublishCount, Subject, Payload) ->
      io:format("~p messages per second~n", [MsgsPerSec]).
     
 create_conns(Host, Port) ->
-    {ok, Sub} = tcnats@sync:connect(Host, Port), 
+    {ok, Sub} = tcnats:connect(Host, Port, #{verbose => true}), 
     {ok, Pub} = tcnats:connect(Host, Port),
     loop_conn_ready(Pub),
     {Pub, Sub}.
@@ -39,7 +39,7 @@ create_conns(Host, Port) ->
 bench(Pub, Sub, PublishCount, Subject, Payload) ->
     Me = self(),
     F = fun() ->
-        tcnats@sync:sub(Sub, Subject),
+        ok = tcnats:sub(Sub, Subject),
         sub_loop(Sub, PublishCount),
         Me ! done
     end,

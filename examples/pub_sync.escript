@@ -10,7 +10,7 @@ main([Subject]) ->
 
 main([Subject, Payload]) ->
     application:start(teacup),
-    {ok, Conn} = tcnats@sync:connect(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
     BinPayload = list_to_binary(Payload),
-    tcnats@sync:pub(Conn, Subject, #{payload => BinPayload}),
+    tcnats:pub(Conn, Subject, #{payload => BinPayload}),
     application:stop(teacup).
