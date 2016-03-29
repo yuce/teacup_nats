@@ -51,28 +51,28 @@ When using asycnhronous connections, you need to wait for a `{Conn, ready}`
 message before publishing messages, subcribing to/unsubscribing from subjects.
 
 * Connection functions:
-    * `teacup_nats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
-    * `teacup_nats:connect(Host :: binary(), Port :: integer())`: Connect to the NATS server
+    * `tcnats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
+    * `tcnats:connect(Host :: binary(), Port :: integer())`: Connect to the NATS server
     at `Host` and port `PORT`,
-    * `teacup_nats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
+    * `tcnats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
     above, but also takes an `Opts` map. Currently usable keys:
         * `user => User :: binary()`,
         * `pass => Password :: binary()`
 * Publish functions:
-    * `teacup_nats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
+    * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
     the subject,
-    * `teacup_nats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
+    * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
     the subject with `Options`. Valid options:
         * `payload => Payload :: binary()`,
         * `reply_to => Subject :: binary()`
 * Subscribe functions:
-    * `teacup_nats:sub(Conn :: teacup_ref(), Subject :: binary())`: Subscribe to the `Subject`,
-    * `teacup_nats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Subscribe to the `Subject`, with
+    * `tcnats:sub(Conn :: teacup_ref(), Subject :: binary())`: Subscribe to the `Subject`,
+    * `tcnats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Subscribe to the `Subject`, with
     `Options`. Valid options:
         * `queue_group => QGroup :: binary()`
 * Unsubscribe functions:
-    * `teacup_nats:unsub(Conn :: teacup_ref(), Subject :: binary())`: Unsubscribe from `Subject`,
-    * `teacup_nats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
+    * `tcnats:unsub(Conn :: teacup_ref(), Subject :: binary())`: Unsubscribe from `Subject`,
+    * `tcnats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
     `Options`. Valid options:
         * `max_messages => MaxMessages :: integer()`: Automatically unsubscribe after receiving `MaxMessages`.
 
@@ -81,7 +81,7 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
 ```erlang
 main() ->
     % Connect to the NATS server
-    {ok, Conn} = teacup_nats:connect(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222),
     % When the connection is OK to use, a `ready` message is sent, wait for it
     ready_loop(Conn).
 
@@ -90,9 +90,9 @@ ready_loop(Conn) ->
         {Conn, ready} ->
             % It's OK to use the connection now
             % Publish some message
-            teacup_nats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
+            tcnats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
             % subscribe to some subject
-            teacup_nats:sub(Conn, <<"foo.*">>),
+            tcnats:sub(Conn, <<"foo.*">>),
             loop(Conn)
     end.
 
@@ -108,7 +108,7 @@ loop(Conn) ->
 ### Synchronous Connection
 
 Synchronous functions use the same signature as the corresponding asynchronous funcitons,
-but their namespace is `teacup_nats@sync` instead of `teacup_nats`.
+but their namespace is `tcnats@sync` instead of `tcnats`.
 
 Connect, publish, subscribe and unsubscribe operations block and return either `ok` on
 success or `{error, Reason :: term()}` on failure.
@@ -118,12 +118,12 @@ success or `{error, Reason :: term()}` on failure.
 ```erlang
 main() ->
     % Connect to the NATS server
-    {ok, Conn} = teacup_nats@sync:connect(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = tcnats@sync:connect(<<"demo.nats.io">>, 4222),
     % The connection is OK to use
     % Publish some message
-    ok = teacup_nats@sync:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
+    ok = tcnats@sync:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
     % subscribe to some subject
-    ok = teacup_nats@sync:sub(Conn, <<"foo.*">>),
+    ok = tcnats@sync:sub(Conn, <<"foo.*">>),
     loop(Conn).
 
 loop(Conn) ->

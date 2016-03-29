@@ -28,7 +28,7 @@
 % (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 % OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
--module(teacup_nats@sync).
+-module(tcnats).
 
 -export([new/0,
          new/1]).
@@ -37,6 +37,7 @@
          connect/3,
          pub/2,
          pub/3,
+         pub_batch/2,
          sub/2,
          sub/3,
          unsub/2,
@@ -60,36 +61,36 @@ connect() ->
 connect(Host, Port) ->
     connect(Host, Port, #{}).
     
-connect(Host, Port, Opts) ->    
-    NewOpts = Opts#{verbose => true},
+connect(Host, Port, Opts) ->
+    NewOpts = Opts#{verbose => false},
     {ok, Conn} = teacup:new(?HANDLER, NewOpts),
-    case teacup:call(Conn, {connect, Host, Port}) of
-        ok ->
-            {ok, Conn};
-        {error, _Reason} = Error ->
-            Error
-    end.
-
+    teacup:connect(Conn, Host, Port),
+    {ok, Conn}.
+    
 pub(Ref, Subject) ->
     pub(Ref, Subject, #{}).
-    
+
 -spec pub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
-    ok | {error, Reason :: term()}.
+    ok.
 pub(Ref, Subject, Opts) ->
-    teacup:call(Ref, {pub, Subject, Opts}).
+    teacup:cast(Ref, {pub, Subject, Opts}).                        
+
+pub_batch(Ref, Batch) ->
+    teacup:cast(Ref, {pub_batch, Batch}).
 
 sub(Ref, Subject) ->
     sub(Ref, Subject, #{}).
 
 -spec sub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
-    ok | {error, Reason :: term()}.
+    ok.
 sub(Ref, Subject, Opts) ->
-    teacup:call(Ref, {sub, Subject, Opts, self()}).    
+    teacup:cast(Ref, {sub, Subject, Opts, self()}).    
 
 unsub(Ref, Subject) ->
     unsub(Ref, Subject, #{}).
 
 -spec unsub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
-    ok | {error, Reason :: term()}.
+    ok.
 unsub(Ref, Subject, Opts) ->
-    teacup:call(Ref, {unsub, Subject, Opts, self()}).
+    teacup:cast(Ref, {unsub, Subject, Opts, self()}).
+
