@@ -7,7 +7,7 @@ main([]) ->
 
 main(Subjects) ->
     application:start(teacup),
-    {ok, Conn} = teacup_nats@sync:connect(<<"demo.nats.io">>, 4222),
+    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
     NewSubjects = [<<"teacup.*">> | Subjects],
     subscribe(Conn, NewSubjects),
     io:format("Subscribed to given subjects.~nSend an `exit` message to subject `teacup.control` to quit.~n"),
@@ -26,4 +26,4 @@ loop(Conn) ->
     end.
     
 subscribe(Conn, Subjects) ->
-    lists:foreach(fun(S) -> teacup_nats@sync:sub(Conn, S) end, Subjects).
+    lists:foreach(fun(S) -> tcnats:sub(Conn, S) end, Subjects).

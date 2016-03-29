@@ -7,7 +7,7 @@ main([]) ->
 
 main(Subjects) ->
     application:start(teacup),
-    {ok, Conn} = teacup_nats:connect(<<"127.0.0.1">>, 4222),
+    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222),
     loop_ready(Conn, Subjects),
     application:stop(teacup).
 
@@ -38,4 +38,4 @@ loop_ready(Conn, Subjects) ->
     end.
 
 subscribe(Conn, Subjects) ->
-    lists:foreach(fun(S) -> teacup_nats:sub(Conn, S) end, Subjects).
+    lists:foreach(fun(S) -> tcnats:sub(Conn, S) end, Subjects).
