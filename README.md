@@ -3,6 +3,9 @@
 A [Teacup](https://github.com/yuce/teacup.git) based Erlang client library for [NATS](http://nats.io/)
 high performance messaging platform.
 
+You can check how the performance of **teacup_nats** compares to other NATS clients
+[here](https://github.com/yuce/nats-client-benchmarks).
+
 ## Getting Started
 
 **teacup_nats** requires Erlang/OTP 18.0+. It uses [rebar3](http://www.rebar3.org/)
