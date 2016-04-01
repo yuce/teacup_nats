@@ -45,7 +45,7 @@
 
 -define(MSG, ?MODULE).
 -define(VERSION, <<"0.3.3">>).
--define(PUBLISH_TIMEOUT, 10).
+-define(SEND_TIMEOUT, 10).
 
 %% == Callbacks
 
@@ -57,28 +57,22 @@ teacup@signature(_) ->
 
 teacup@init(Opts) ->
     NewOpts = maps:merge(default_opts(), Opts),
-    {ok, NewOpts#{ready => false,
-                  from => undefined}}.
+    {ok, reset_state(NewOpts)}.
 
 teacup@status(connect, State) ->
     nats_msg:init(),
-    NewState = State#{data_acc => <<>>,
-                      server_info => #{},
-                      next_sid => 0,
-                      sid_to_key => #{},
-                      key_to_sid => #{},
-                      ready => false,
-                      pub_batch => [],
-                      pub_timer => undefined},
+    NewState = reset_state(State),
     notify_parent({status, connect}, State),
     {noreply, NewState};
 
 teacup@status({disconnect, _}, State) ->
     notify_parent({status, disconnect}, State),
-    {stop, normal, State};
+    {noreply, State#{ready => false,
+                     batch_timer => undefined}};
 
 teacup@status(Status, State) ->
-    notify_parent({status, Status}, State).
+    notify_parent({status, Status}, State),
+    {noreply, State}.
 
 teacup@data(Data, #{data_acc := DataAcc} = State) ->
     NewData = <<DataAcc/binary, Data/binary>>,
@@ -89,6 +83,10 @@ teacup@data(Data, #{data_acc := DataAcc} = State) ->
         Other ->
             Other
     end.
+
+teacup@error(econnrefused = Reason, State) ->
+    notify_parent({error, Reason}, State),
+    {noreply, State};
 
 teacup@error(Reason, State) ->
     notify_parent({error, Reason}, State),
@@ -118,14 +116,8 @@ teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
     {noreply, State};
 
-teacup@cast({pub, Subject, Opts},
-            #{ready := true} = State) ->
+teacup@cast({pub, Subject, Opts}, State) ->
     NewState = do_pub(Subject, Opts, State),
-    {noreply, NewState};
-
-teacup@cast({pub_batch, Batch},
-            #{ready := true} = State) ->
-    NewState = do_pub_batch(Batch, State),
     {noreply, NewState};
 
 teacup@cast({sub, Subject, Opts, Pid}, State) ->
@@ -139,22 +131,21 @@ teacup@cast({unsub, Subject, Opts, Pid}, State) ->
 teacup@info(ready, #{ready := false,
                      from := undefined} = State) ->
     notify_parent(ready, State),
-    {noreply, State#{ready => true}};
+    BatchTimer = batch_timer(State),
+    {noreply, State#{ready => true,
+                     batch_timer => BatchTimer}};
 
 teacup@info(ready, State) ->
     % Ignore other ready messages
     {noreply, State};
 
-teacup@info(publish_timeout, #{pub_batch := PubBatch} = State) ->
-    PubTimer = case PubBatch of
-        [] ->
-            undefined;
-        _ ->
-            teacup_server:send(self(), lists:reverse(PubBatch)),
-            erlang:send_after(?PUBLISH_TIMEOUT, self(), publish_timeout)
-    end,
-    {noreply, State#{pub_batch => [],
-                     pub_timer => PubTimer}}.
+teacup@info(batch_timeout, #{ready := false} = State) ->
+    {noreply, State#{batch_timer => undefined}};
+
+teacup@info(batch_timeout, #{batch := Batch} = State) ->
+    send_batch(Batch),
+    {noreply, State#{batch => [],
+                     batch_timer => undefined}}.
 
 %% == Internal
 
@@ -167,7 +158,20 @@ default_opts() ->
       pass => undefined,
       name => <<"teacup_nats">>,
       lang => <<"erlang">>,
-      version => ?VERSION}.
+      version => ?VERSION,
+      buffer_size => 0}.
+
+reset_state(State) ->
+    Default = #{data_acc => <<>>,
+                server_info => #{},
+                next_sid => 0,
+                sid_to_key => #{},
+                key_to_sid => #{},
+                ready => false,
+                batch => [],
+                batch_timer => undefined,
+                from => undefined},    
+    maps:merge(Default, State#{ready => false}).
 
 interp_messages(Messages, State) ->
     F = fun(M, {Rs, S}) ->
@@ -261,57 +265,63 @@ do_connect(Host, Port, #{ref@ := Ref} = State) ->
     teacup:connect(Ref, Host, Port),
     State.
 
-do_pub(Subject, Opts, #{pub_batch := PubBatch,
-                        pub_timer := PubTimer} = State) ->
+do_pub(Subject, Opts, State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),
     Payload = maps:get(payload, Opts, <<>>),
     BinMsg = nats_msg:pub(Subject, ReplyTo, Payload),
-    NewState = State#{pub_batch => [BinMsg | PubBatch]},
-    case PubTimer of
-        undefined ->
-            NewPubTimer = erlang:send_after(?PUBLISH_TIMEOUT,
-                                            self(),
-                                            publish_timeout),
-            NewState#{pub_timer => NewPubTimer};
-        _ ->
-            NewState
-    end.
-
-do_pub_batch(Batch, State) ->
-    F = fun({Subject, Opts}) ->
-        ReplyTo = maps:get(reply_to, Opts, undefined),
-        Payload = maps:get(payload, Opts, <<>>),
-        nats_msg:pub(Subject, ReplyTo, Payload)
-    end,
-    BinBatch = lists:map(F, Batch),
-    teacup_server:send(self(), BinBatch),
-    State.
+    queue_msg(BinMsg, State).
 
 do_sub(Subject, Opts, Pid, #{next_sid := DefaultSid,
                              sid_to_key := SidToKey,
-                             key_to_sid := KeyToSid,
-                             ready := true} = State) ->
+                             key_to_sid := KeyToSid} = State) ->
     K = {Subject, Pid},
     Sid = maps:get(K, KeyToSid, integer_to_binary(DefaultSid)),
     NewKeyToSid = maps:put(K, Sid, KeyToSid),
     NewSidToKey = maps:put(Sid, K, SidToKey),
     QueueGrp = maps:get(queue_group, Opts, undefined),
     BinMsg = nats_msg:sub(Subject, QueueGrp, Sid),
-    teacup_server:send(self(), BinMsg),
-    State#{next_sid => DefaultSid + 1,
-           sid_to_key => NewSidToKey,
-           key_to_sid => NewKeyToSid}.
+    queue_msg(BinMsg, State#{next_sid => DefaultSid + 1,
+                             sid_to_key => NewSidToKey,
+                             key_to_sid => NewKeyToSid}).
 
-do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid,
-                               ready := true} = State) ->
+do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid} = State) ->
     % Should we crash if Sid for Pid not found?
     Sid = maps:get({Subject, Pid}, KeyToSid, undefined),
     case Sid of
         undefined ->
-            ok;
+            State;
         _ ->
             MaxMsgs = maps:get(max_messages, Opts, undefined),
             BinMsg = nats_msg:unsub(Sid, MaxMsgs),
-            teacup_server:send(self(), BinMsg)
+            queue_msg(BinMsg, State)
+    end.
+
+send_batch([]) -> ok;
+send_batch(Batch) ->
+    teacup_server:send(self(), lists:reverse(Batch)).
+
+queue_msg(BinMsg, #{batch := Batch,
+                    batch_timer := BatchTimer,
+                    ready := Ready} = State) ->
+    NewBatch = [BinMsg | Batch],
+    NewBatchTimer = case {Ready, BatchTimer} of
+        {true, undefined} ->
+            erlang:send_after(?SEND_TIMEOUT,
+                              self(),
+                              batch_timeout);
+        _ ->
+            undefined
     end,
-    State.
+    State#{batch => NewBatch,
+           batch_timer => NewBatchTimer}.
+
+batch_timer(#{batch := []}) ->
+    undefined;
+
+batch_timer(#{batch_timer := BatchTimer}) when BatchTimer /= undefined ->
+    undefined;
+   
+batch_timer(_) ->
+    erlang:send_after(?SEND_TIMEOUT,
+                      self(),
+                      batch_timeout).
