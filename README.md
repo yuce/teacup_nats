@@ -59,9 +59,13 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
     at `Host` and port `PORT`,
     * `tcnats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
     above, but also takes an `Opts` map. Currently usable keys:
-        * `verbose => true | false`,
+        * `verbose => true | false`: If `verbose == true`, NATS server
+        sends an acknowledgement message on `pub`, `sub`, `unsub` operations and
+        `connect` operation becomes synchronous.
         * `user => User :: binary()`,
-        * `pass => Password :: binary()`
+        * `pass => Password :: binary()`,
+        * `buffer_size => MessageBufferSize :: non_neg_integer()`: The number of publish messages
+        to buffer before quitting. The default is 0. 
 * Publish functions:
     * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
     the subject,

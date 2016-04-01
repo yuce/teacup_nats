@@ -170,6 +170,7 @@ reset_state(State) ->
                 ready => false,
                 batch => [],
                 batch_timer => undefined,
+                batch_size => 0,
                 from => undefined},    
     maps:merge(Default, State#{ready => false}).
 
@@ -300,8 +301,13 @@ send_batch([]) -> ok;
 send_batch(Batch) ->
     teacup_server:send(self(), lists:reverse(Batch)).
 
+queue_msg(_, #{buffer_size := Size,
+               batch_size := Size}) ->
+    throw({nats@teacup, increase_buffer_size});
+
 queue_msg(BinMsg, #{batch := Batch,
                     batch_timer := BatchTimer,
+                    batch_size := BatchSize,
                     ready := Ready} = State) ->
     NewBatch = [BinMsg | Batch],
     NewBatchTimer = case {Ready, BatchTimer} of
@@ -313,7 +319,8 @@ queue_msg(BinMsg, #{batch := Batch,
             undefined
     end,
     State#{batch => NewBatch,
-           batch_timer => NewBatchTimer}.
+           batch_timer => NewBatchTimer,
+           batch_size => BatchSize + 1}.
 
 batch_timer(#{batch := []}) ->
     undefined;
