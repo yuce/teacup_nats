@@ -11,6 +11,7 @@ high performance messaging platform.
     which boosts the performance by 50%.
     * Implemented connect retrials / reconnect strategy.
     * Implemented message buffering.
+    * Sub and Unsub messages are quueued.
 
 * **2016-03-27**: You can check how the performance of **teacup_nats** compares to other NATS clients
 [here](https://github.com/yuce/nats-client-benchmarks).
