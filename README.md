@@ -5,13 +5,13 @@ high performance messaging platform.
 
 ## NEWS
 
-* **2016-04-03**: Release version 0.3.3. This release brings:
+* **2016-04-03**: Released version 0.3.3. This release brings:
 
-    * Using [teacup 0.3.3](https://github.com/yuce/teacup/tree/0.3.3)
+    * Using [teacup 0.3.3](https://github.com/yuce/teacup/tree/0.3.3),
     which boosts the performance by 50%.
-    * Implemented connect retrials / reconnect strategy.
+    * Implemented connect retry / reconnect strategy.
     * Implemented message buffering.
-    * Sub and Unsub messages are quueued.
+    * Sub and Unsub messages are queued.
 
 * **2016-03-27**: You can check how the performance of **teacup_nats** compares to other NATS clients
 [here](https://github.com/yuce/nats-client-benchmarks).
