@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <link href='https://fonts.googleapis.com/css?family=Architects+Daughter' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/print.css" media="print">
+
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+
+    <title>Teacup NATS by yuce</title>
+  </head>
+
+  <body>
+    <header>
+      <div class="inner">
+        <h1>Teacup NATS</h1>
+        <h2>Teacup based NATS client for Erlang</h2>
+        <a href="https://github.com/yuce/teacup_nats" class="button"><small>View project on</small> GitHub</a>
+      </div>
+    </header>
+
+    <div id="content-wrapper">
+      <div class="inner clearfix">
+        <section id="main-content">
+          <h1>
+<a id="teacup_nats" class="anchor" href="#teacup_nats" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>teacup_nats</h1>
+
+<p>A <a href="https://github.com/yuce/teacup.git">Teacup</a> based Erlang client library for <a href="http://nats.io/">NATS</a>
+high performance messaging platform.</p>
+
+<h2>
+<a id="news" class="anchor" href="#news" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>NEWS</h2>
+
+<ul>
+<li>
+<p><strong>2016-04-03</strong>: Released version 0.3.3. This release brings:</p>
+
+<ul>
+<li>Using <a href="https://github.com/yuce/teacup/tree/0.3.3">teacup 0.3.3</a>,
+which boosts the performance by 50%.</li>
+<li>Implemented connect retry / reconnect strategy.</li>
+<li>Implemented message buffering.</li>
+<li>Sub and Unsub messages are queued.</li>
+</ul>
+</li>
+<li><p><strong>2016-03-27</strong>: You can check how the performance of <strong>teacup_nats</strong> compares to other NATS clients
+<a href="https://github.com/yuce/nats-client-benchmarks">here</a>.</p></li>
+<li><p><strong>2016-03-19</strong>: Initial release.</p></li>
+</ul>
+
+<h2>
+<a id="getting-started" class="anchor" href="#getting-started" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Getting Started</h2>
+
+<p><strong>teacup_nats</strong> requires Erlang/OTP 18.0+. It uses <a href="http://www.rebar3.org/">rebar3</a>
+as the build tool and is available on <a href="https://hex.pm/">hex.pm</a>. Just include the following
+in your <code>rebar.config</code>:</p>
+
+<div class="highlight highlight-source-erlang"><pre>{<span class="pl-c1">deps</span>, [<span class="pl-c1">teacup_nats</span>]}.</pre></div>
+
+<p><strong>teacup_nats</strong> depends on the <code>teacup</code> app to be started. Include it in your <code>.app.src</code> file:</p>
+
+<div class="highlight highlight-source-erlang"><pre>...
+  {<span class="pl-c1">applications</span>,
+   [<span class="pl-c1">kernel</span>,
+    <span class="pl-c1">stdlib</span>,
+    <span class="pl-c1">teacup</span>
+   ]},
+...</pre></div>
+
+<p>Or, start it manually:</p>
+
+<div class="highlight highlight-source-erlang"><pre><span class="pl-c1">ok</span> <span class="pl-k">=</span> <span class="pl-en">application</span>:<span class="pl-en">start</span>(<span class="pl-c1">teacup</span>).</pre></div>
+
+<p><strong>rebar3</strong> has a nice way of starting apps in the shell, you can try:</p>
+
+<pre><code>$ rebar3 shell --apps teacup
+</code></pre>
+
+<h2>
+<a id="todo" class="anchor" href="#todo" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>TODO</h2>
+
+<ul>
+<li>Clustering</li>
+<li>TLS transport support</li>
+</ul>
+
+<h2>
+<a id="api" class="anchor" href="#api" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>API</h2>
+
+<h3>
+<a id="aysnchronous-connection" class="anchor" href="#aysnchronous-connection" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Aysnchronous Connection</h3>
+
+<p>When using asycnhronous connections, you need to wait for a <code>{Conn, ready}</code>
+message before publishing messages, subcribing to/unsubscribing from subjects.</p>
+
+<ul>
+<li>Connection functions:
+
+<ul>
+<li>
+<code>tcnats:connect()</code>: Connect to the NATS server at address <code>127.0.0.1</code>, port <code>4222</code>,</li>
+<li>
+<code>tcnats:connect(Host :: binary(), Port :: integer())</code>: Connect to the NATS server
+at <code>Host</code> and port <code>PORT</code>,</li>
+<li>
+<code>tcnats:connect(Host :: binary(), Port :: integer(), Opts :: map())</code>: Similar to
+above, but also takes an <code>Opts</code> map. Currently usable keys:
+
+<ul>
+<li>
+<code>verbose =&gt; true | false</code>: If <code>verbose == true</code>, NATS server
+sends an acknowledgement message on <code>pub</code>, <code>sub</code>, <code>unsub</code> operations and
+<code>connect</code> operation becomes synchronous.</li>
+<li>
+<code>user =&gt; User :: binary()</code>,</li>
+<li>
+<code>pass =&gt; Password :: binary()</code>,</li>
+<li>
+<code>buffer_size =&gt; MessageBufferSize :: non_neg_integer()</code>: The number of publish messages
+to buffer before quitting. The default is 0. Setting <code>MesssageBufferSize</code> to
+<code>infinity</code> enables unlimited buffering.</li>
+<li>
+<code>reconnect =&gt; {Interval :: non_neg_integer(), MaxRetry :: non_neg_integer()}</code>: Specifies
+reconnect strategy. <code>Interval</code> is the time in milliseconds between retrials, and <code>MaxRetry</code> is
+the number of retrials before quitting. You can set <code>MaxRetry</code> to <code>infinity</code> to try reconnecting
+forever. The default is <code>{undefined, 0}</code>, "don't try to reconnect".</li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Publish functions:
+
+<ul>
+<li>
+<code>tcnats:pub(Conn :: teacup_ref(), Subject :: binary())</code>: Publish message with only
+the subject,</li>
+<li>
+<code>tcnats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()</code>: Publish message
+the subject with <code>Options</code>. Valid options:
+
+<ul>
+<li>
+<code>payload =&gt; Payload :: binary()</code>,</li>
+<li><code>reply_to =&gt; Subject :: binary()</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Subscribe functions:
+
+<ul>
+<li>
+<code>tcnats:sub(Conn :: teacup_ref(), Subject :: binary())</code>: Subscribe to the <code>Subject</code>,</li>
+<li>
+<code>tcnats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())</code>: Subscribe to the <code>Subject</code>, with
+<code>Options</code>. Valid options:
+
+<ul>
+<li><code>queue_group =&gt; QGroup :: binary()</code></li>
+</ul>
+</li>
+</ul>
+</li>
+<li>Unsubscribe functions:
+
+<ul>
+<li>
+<code>tcnats:unsub(Conn :: teacup_ref(), Subject :: binary())</code>: Unsubscribe from <code>Subject</code>,</li>
+<li>
+<code>tcnats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())</code>: Unsubscribe from <code>Subject</code>, with
+<code>Options</code>. Valid options:
+
+<ul>
+<li>
+<code>max_messages =&gt; MaxMessages :: integer()</code>: Automatically unsubscribe after receiving <code>MaxMessages</code>.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+
+<h4>
+<a id="sample" class="anchor" href="#sample" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sample</h4>
+
+<div class="highlight highlight-source-erlang"><pre><span class="pl-en">main</span>() <span class="pl-k">-&gt;</span>
+    <span class="pl-c">% Connect to the NATS server</span>
+    {<span class="pl-c1">ok</span>, <span class="pl-smi">Conn</span>} <span class="pl-k">=</span> <span class="pl-en">tcnats</span>:<span class="pl-en">connect</span>(&lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>demo.nats.io<span class="pl-pds">"</span></span>&gt;&gt;, <span class="pl-c1">4222</span>),
+    <span class="pl-c">% When the connection is OK to use, a `ready` message is sent, wait for it</span>
+    <span class="pl-en">ready_loop</span>(<span class="pl-smi">Conn</span>).
+
+<span class="pl-en">ready_loop</span>(<span class="pl-smi">Conn</span>) <span class="pl-k">-&gt;</span>
+    <span class="pl-k">receive</span>
+        {<span class="pl-smi">Conn</span>, <span class="pl-c1">ready</span>} -&gt;
+            <span class="pl-c">% It's OK to use the connection now</span>
+            <span class="pl-c">% Publish some message</span>
+            <span class="pl-en">tcnats</span>:<span class="pl-en">pub</span>(<span class="pl-smi">Conn</span>, &lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>teacup.control<span class="pl-pds">"</span></span>&gt;&gt;, #{<span class="pl-c1">payload</span> <span class="pl-k">=&gt;</span> &lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>start<span class="pl-pds">"</span></span>&gt;&gt;}),
+            <span class="pl-c">% subscribe to some subject</span>
+            <span class="pl-en">tcnats</span>:<span class="pl-en">sub</span>(<span class="pl-smi">Conn</span>, &lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>foo.*<span class="pl-pds">"</span></span>&gt;&gt;),
+            <span class="pl-en">loop</span>(<span class="pl-smi">Conn</span>)
+    <span class="pl-k">end</span>.
+
+<span class="pl-en">loop</span>(<span class="pl-smi">Conn</span>) <span class="pl-k">-&gt;</span>
+    <span class="pl-k">receive</span>
+        {<span class="pl-smi">Conn</span>, {<span class="pl-c1">msg</span>, <span class="pl-smi">Subject</span>, <span class="pl-smi">_ReplyTo</span>, <span class="pl-smi">Payload</span>}} -&gt;
+            <span class="pl-c">% Do something with the received message</span>
+            <span class="pl-en">io</span>:<span class="pl-en">format</span>(<span class="pl-s"><span class="pl-pds">"</span><span class="pl-c1">~p</span>: <span class="pl-c1">~p~n</span><span class="pl-pds">"</span></span>, [<span class="pl-smi">Subject</span>, <span class="pl-smi">Payload</span>]),
+            <span class="pl-en">loop</span>(<span class="pl-smi">Conn</span>)
+    <span class="pl-k">end</span>.</pre></div>
+
+<h3>
+<a id="synchronous-connection" class="anchor" href="#synchronous-connection" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Synchronous Connection</h3>
+
+<p>In order to activate the synchronous mode, just pass <code>#{verbose =&gt; true</code> to <code>tcnats:connect</code>.</p>
+
+<p>Connect, publish, subscribe and unsubscribe operations block and return either <code>ok</code> on
+success or <code>{error, Reason :: term()}</code> on failure.</p>
+
+<h4>
+<a id="sample-1" class="anchor" href="#sample-1" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Sample</h4>
+
+<div class="highlight highlight-source-erlang"><pre><span class="pl-en">main</span>() <span class="pl-k">-&gt;</span>
+    <span class="pl-c">% Connect to the NATS server</span>
+    {<span class="pl-c1">ok</span>, <span class="pl-smi">Conn</span>} <span class="pl-k">=</span> <span class="pl-en">tcnats</span>:<span class="pl-en">connect</span>(&lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>demo.nats.io<span class="pl-pds">"</span></span>&gt;&gt;, <span class="pl-c1">4222</span>, #{<span class="pl-c1">verbose</span> <span class="pl-k">=&gt;</span> <span class="pl-c1">true</span>}),
+    <span class="pl-c">% The connection is OK to use</span>
+    <span class="pl-c">% Publish some message</span>
+    <span class="pl-c1">ok</span> <span class="pl-k">=</span> <span class="pl-en">tcnats</span>:<span class="pl-en">pub</span>(<span class="pl-smi">Conn</span>, &lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>teacup.control<span class="pl-pds">"</span></span>&gt;&gt;, #{<span class="pl-c1">payload</span> <span class="pl-k">=&gt;</span> &lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>start<span class="pl-pds">"</span></span>&gt;&gt;}),
+    <span class="pl-c">% subscribe to some subject</span>
+    <span class="pl-c1">ok</span> <span class="pl-k">=</span> <span class="pl-en">tcnats</span>:<span class="pl-en">sub</span>(<span class="pl-smi">Conn</span>, &lt;&lt;<span class="pl-s"><span class="pl-pds">"</span>foo.*<span class="pl-pds">"</span></span>&gt;&gt;),
+    <span class="pl-en">loop</span>(<span class="pl-smi">Conn</span>).
+
+<span class="pl-en">loop</span>(<span class="pl-smi">Conn</span>) <span class="pl-k">-&gt;</span>
+    <span class="pl-k">receive</span>
+        {<span class="pl-smi">Conn</span>, {<span class="pl-c1">msg</span>, <span class="pl-smi">Subject</span>, <span class="pl-smi">_ReplyTo</span>, <span class="pl-smi">Payload</span>}} -&gt;
+            <span class="pl-c">% Do something with the received message</span>
+            <span class="pl-en">io</span>:<span class="pl-en">format</span>(<span class="pl-s"><span class="pl-pds">"</span><span class="pl-c1">~p</span>: <span class="pl-c1">~p~n</span><span class="pl-pds">"</span></span>, [<span class="pl-smi">Subject</span>, <span class="pl-smi">Payload</span>]),
+            <span class="pl-en">loop</span>(<span class="pl-smi">Conn</span>)
+    <span class="pl-k">end</span>.
+</pre></div>
+
+<h2>
+<a id="license" class="anchor" href="#license" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>License</h2>
+
+<pre><code>Copyright (c) 2016, Yuce Tekol &lt;yucetekol@gmail.com&gt;.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+* Redistributions of source code must retain the above copyright
+  notice, this list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright
+  notice, this list of conditions and the following disclaimer in the
+  documentation and/or other materials provided with the distribution.
+
+* The names of its contributors may not be used to endorse or promote
+  products derived from this software without specific prior written
+  permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+</code></pre>
+        </section>
+
+        <aside id="sidebar">
+          <a href="https://github.com/yuce/teacup_nats/zipball/master" class="button">
+            <small>Download</small>
+            .zip file
+          </a>
+          <a href="https://github.com/yuce/teacup_nats/tarball/master" class="button">
+            <small>Download</small>
+            .tar.gz file
+          </a>
+
+          <p class="repo-owner"><a href="https://github.com/yuce/teacup_nats"></a> is maintained by <a href="https://github.com/yuce">yuce</a>.</p>
+
+          <p>This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the Architect theme by <a href="https://twitter.com/jasonlong">Jason Long</a>.</p>
+        </aside>
+      </div>
+    </div>
+
+  
+  </body>
+</html>
