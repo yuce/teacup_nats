@@ -65,6 +65,19 @@ teacup@status(connect, State) ->
     notify_parent({status, connect}, State),
     {noreply, NewState};
 
+teacup@status({disconnect, ForceDisconnect},
+              #{reconnect := {Interval, MaxTrials},
+                reconnect_try := Trial} = State) ->
+    notify_parent({status, disconnect}, State),
+    case ForceDisconnect of
+        false when MaxTrials /= Trial ->
+            reconnect_timer(Interval);
+        _ ->
+            ok
+    end,
+    {noreply, State#{ready => false,
+                    batch_timer => undefined}};
+
 teacup@status({disconnect, _}, State) ->
     notify_parent({status, disconnect}, State),
     {noreply, State#{ready => false,
@@ -84,8 +97,14 @@ teacup@data(Data, #{data_acc := DataAcc} = State) ->
             Other
     end.
 
-teacup@error(econnrefused = Reason, State) ->
+teacup@error(econnrefused = Reason,
+             #{reconnect := {_, MaxTrials},
+               reconnect_try := MaxTrials} = State) ->
     notify_parent({error, Reason}, State),
+    {stop, {nats@teacup, Reason}, State};
+    
+teacup@error(econnrefused, #{reconnect := {Interval, _}} = State) ->
+    reconnect_timer(Interval),
     {noreply, State};
 
 teacup@error(Reason, State) ->
@@ -93,40 +112,35 @@ teacup@error(Reason, State) ->
     {stop, Reason, State}.
 
 teacup@call({connect, Host, Port}, From, State) ->
-    NewState = do_connect(Host, Port, State#{from => From}),
+    NewState = State#{from => From},
+    do_connect(Host, Port),
     {noreply, NewState};
 
 teacup@call({pub, Subject, Opts}, From, State) ->
-    NewState = do_pub(Subject, Opts, State#{from := From}),
-    {noreply, NewState};
+    do_pub(Subject, Opts, State#{from := From});
 
 teacup@call({sub, Subject, Opts, Pid}, From, State) ->
-    NewState = do_sub(Subject, Opts, Pid, State#{from := From}),
-    {noreply, NewState};
+    do_sub(Subject, Opts, Pid, State#{from := From});
 
 teacup@call({unsub, Subject, Opts, Pid}, From, State) ->
-    NewState = do_unsub(Subject, Opts, Pid, State#{from := From}),
-    {noreply, NewState}.
+    do_unsub(Subject, Opts, Pid, State#{from := From}).
 
 teacup@cast({connect, Host, Port}, State) ->
-    NewState = do_connect(Host, Port, State),
-    {noreply, NewState};
+    do_connect(Host, Port),
+    {noreply, State};
 
 teacup@cast(ping, #{ready := true} = State) ->
     teacup_server:send(self(), nats_msg:ping()),
     {noreply, State};
 
 teacup@cast({pub, Subject, Opts}, State) ->
-    NewState = do_pub(Subject, Opts, State),
-    {noreply, NewState};
+    do_pub(Subject, Opts, State);
 
 teacup@cast({sub, Subject, Opts, Pid}, State) ->
-    NewState = do_sub(Subject, Opts, Pid, State),
-    {noreply, NewState};
+    do_sub(Subject, Opts, Pid, State);
 
 teacup@cast({unsub, Subject, Opts, Pid}, State) ->
-    NewState = do_unsub(Subject, Opts, Pid, State),
-    {noreply, NewState}.
+    do_unsub(Subject, Opts, Pid, State).
 
 teacup@info(ready, #{ready := false,
                      from := undefined} = State) ->
@@ -145,7 +159,12 @@ teacup@info(batch_timeout, #{ready := false} = State) ->
 teacup@info(batch_timeout, #{batch := Batch} = State) ->
     send_batch(Batch),
     {noreply, State#{batch => [],
-                     batch_timer => undefined}}.
+                     batch_timer => undefined}};
+
+teacup@info(reconnect_timeout, #{reconnect_try := ReconnectTry} = State) ->
+    NewState = State#{reconnect_try => ReconnectTry + 1},
+    do_connect(),
+    {noreply, NewState}.
 
 %% == Internal
 
@@ -159,7 +178,8 @@ default_opts() ->
       name => <<"teacup_nats">>,
       lang => <<"erlang">>,
       version => ?VERSION,
-      buffer_size => 0}.
+      buffer_size => 0,
+      reconnect => {undefined, 0}}.
 
 reset_state(State) ->
     Default = #{data_acc => <<>>,
@@ -171,7 +191,8 @@ reset_state(State) ->
                 batch => [],
                 batch_timer => undefined,
                 batch_size => 0,
-                from => undefined},    
+                from => undefined,
+                reconnect_try => 0},    
     maps:merge(Default, State#{ready => false}).
 
 interp_messages(Messages, State) ->
@@ -262,9 +283,11 @@ notify_parent(What, #{parent@ := Parent,
                       ref@ := Ref}) ->
     Parent ! {Ref, What}.
 
-do_connect(Host, Port, #{ref@ := Ref} = State) ->
-    teacup:connect(Ref, Host, Port),
-    State.
+do_connect() ->
+    teacup_server:connect(self()).
+
+do_connect(Host, Port) ->
+    teacup_server:connect(self(), Host, Port).
 
 do_pub(Subject, Opts, State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),
@@ -290,7 +313,7 @@ do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid} = State) ->
     Sid = maps:get({Subject, Pid}, KeyToSid, undefined),
     case Sid of
         undefined ->
-            State;
+            {noreply, State};
         _ ->
             MaxMsgs = maps:get(max_messages, Opts, undefined),
             BinMsg = nats_msg:unsub(Sid, MaxMsgs),
@@ -301,9 +324,12 @@ send_batch([]) -> ok;
 send_batch(Batch) ->
     teacup_server:send(self(), lists:reverse(Batch)).
 
-queue_msg(_, #{buffer_size := Size,
-               batch_size := Size}) ->
-    throw({nats@teacup, increase_buffer_size});
+queue_msg(_, #{ready := false,
+               buffer_size := Size,
+               batch_size := Size} = State) ->
+    Reason = buffer_overflow,
+    notify_parent({error, Reason}, State),
+    {stop, {nats@teacup, Reason}, State};
 
 queue_msg(BinMsg, #{batch := Batch,
                     batch_timer := BatchTimer,
@@ -318,9 +344,9 @@ queue_msg(BinMsg, #{batch := Batch,
         _ ->
             undefined
     end,
-    State#{batch => NewBatch,
-           batch_timer => NewBatchTimer,
-           batch_size => BatchSize + 1}.
+    {noreply, State#{batch => NewBatch,
+                     batch_timer => NewBatchTimer,
+                     batch_size => BatchSize + 1}}.
 
 batch_timer(#{batch := []}) ->
     undefined;
@@ -332,3 +358,9 @@ batch_timer(_) ->
     erlang:send_after(?SEND_TIMEOUT,
                       self(),
                       batch_timeout).
+
+reconnect_timer(infinity) ->
+    ok;
+
+reconnect_timer(Interval) ->
+    erlang:send_after(Interval, self(), reconnect_timeout).

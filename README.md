@@ -65,7 +65,11 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
         * `user => User :: binary()`,
         * `pass => Password :: binary()`,
         * `buffer_size => MessageBufferSize :: non_neg_integer()`: The number of publish messages
-        to buffer before quitting. The default is 0. 
+        to buffer before quitting. The default is 0.
+        * `reconnect => {Interval :: non_neg_integer(), MaxRetry :: non_neg_integer()}`: Specifies
+        reconnect strategy. `Interval` is the time in milliseconds between retrials, and `MaxRetry` is
+        the number of retrials before quitting. You can set `MaxRetry` to `infinity` to try reconnecting
+        forever. The default is `{undefined, 0}`, "don't try to reconnect".
 * Publish functions:
     * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
     the subject,
