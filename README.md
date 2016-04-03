@@ -3,6 +3,21 @@
 A [Teacup](https://github.com/yuce/teacup.git) based Erlang client library for [NATS](http://nats.io/)
 high performance messaging platform.
 
+## NEWS
+
+* **2016-04-03**: Release version 0.3.3. This release brings:
+
+    * Using [teacup 0.3.3](https://github.com/yuce/teacup/tree/0.3.3)
+    which boosts the performance by 50%.
+    * Implemented connect retrials / reconnect strategy.
+    * Implemented message buffering.
+    * Sub and Unsub messages are quueued.
+
+* **2016-03-27**: You can check how the performance of **teacup_nats** compares to other NATS clients
+[here](https://github.com/yuce/nats-client-benchmarks).
+
+* **2016-03-19**: Initial release.
+
 ## Getting Started
 
 **teacup_nats** requires Erlang/OTP 18.0+. It uses [rebar3](http://www.rebar3.org/)
@@ -56,9 +71,18 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
     at `Host` and port `PORT`,
     * `tcnats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
     above, but also takes an `Opts` map. Currently usable keys:
-        * `verbose => true | false`,
+        * `verbose => true | false`: If `verbose == true`, NATS server
+        sends an acknowledgement message on `pub`, `sub`, `unsub` operations and
+        `connect` operation becomes synchronous.
         * `user => User :: binary()`,
-        * `pass => Password :: binary()`
+        * `pass => Password :: binary()`,
+        * `buffer_size => MessageBufferSize :: non_neg_integer()`: The number of publish messages
+        to buffer before quitting. The default is 0. Setting `MesssageBufferSize` to
+        `infinity` enables unlimited buffering.
+        * `reconnect => {Interval :: non_neg_integer(), MaxRetry :: non_neg_integer()}`: Specifies
+        reconnect strategy. `Interval` is the time in milliseconds between retrials, and `MaxRetry` is
+        the number of retrials before quitting. You can set `MaxRetry` to `infinity` to try reconnecting
+        forever. The default is `{undefined, 0}`, "don't try to reconnect".
 * Publish functions:
     * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
     the subject,
