@@ -195,47 +195,71 @@ reset_state(State) ->
                 reconnect_try => 0},    
     maps:merge(Default, State#{ready => false}).
 
-interp_messages(Messages, State) ->
-    F = fun(M, {Rs, S}) ->
-        case interp_message(M, S) of
-            {[], NS} -> {Rs, NS}
-            % {NR, NS} -> {[NR|Rs], NS}
-        end
-    end,
-    try lists:foldl(F, {[], State}, Messages) of
-        {Response, NewState} ->
-            case Response of
-                [] -> ok;
-                _ -> teacup_server:send(self(), lists:reverse(Response))
-            end,
-            {noreply, NewState}
+interp_messages([], State) ->
+    {noreply, State};
+
+interp_messages([H|T], #{callbacks@ := #{teacup@error := TError}} = State) ->
+    try interp_message(H, State) of
+        {ok, NewState} ->
+            interp_messages(T, NewState);
+        {error, Reason} ->
+            case TError(Reason, State) of
+                {noreply, NewState1} ->
+                    interp_messages(T, NewState1);
+                Other ->
+                    Other
+            end
     catch
-        throw:disconnect ->
+        disconnect ->
             {stop, normal, State}
     end.
 
-interp_message([], State) ->
-    {[], State};
+% interp_messages(Messages, State) ->
+%     F = fun(M, {Rs, S}) ->
+%         case interp_message(M, S) of
+%             {[], NS} -> {Rs, NS}
+%             % {NR, NS} -> {[NR|Rs], NS}
+%         end
+%     end,
+%     try lists:foldl(F, {[], State}, Messages) of
+%         {Response, NewState} ->
+%             case Response of
+%                 [] -> ok;
+%                 _ -> teacup_server:send(self(), lists:reverse(Response))
+%             end,
+%             {noreply, NewState}
+%     catch
+%         throw:disconnect ->
+%             {stop, normal, State}
+%     end.
+
+% interp_message([], State) ->
+%     {[], State};
 
 interp_message(ping, State) ->
     % Send pong messages immediately
     teacup_server:send(self(), nats_msg:pong()),
-    {[], State};
+    {ok, State};
 
 interp_message(pong, State) ->
     % TODO: reset ping timer
-    {[], State};
+    {ok, State};
 
-interp_message({info, BinInfo}, #{from := From} = State) ->
+interp_message({info, BinInfo},
+               #{from := From} = State) ->
     % Send connect messages immediately
     Info = jsx:decode(BinInfo, [return_maps]),
-    NewState = State#{server_info => Info},
-    teacup_server:send(self(), client_info(NewState)),
-    case From of
-        undefined -> self() ! ready;
-        _ -> ok
-    end,
-    {[], NewState};
+    case ssl_upgrade(Info, State#{server_info => Info}) of
+        {ok, NewState} ->
+            teacup_server:send(self(), client_info(NewState)),
+            case From of
+                undefined -> self() ! ready;
+                _ -> ok
+            end,
+            {ok, NewState};
+        {error, Reason} ->
+            {error, Reason}
+    end;            
 
 interp_message({msg, {Subject, Sid, ReplyTo, Payload}},
                #{ref@ := Ref,
@@ -246,24 +270,24 @@ interp_message({msg, {Subject, Sid, ReplyTo, Payload}},
             Resp = {msg, Subject, ReplyTo, Payload},
             Pid ! {Ref, Resp}
     end,
-    {[], State};
+    {ok, State};
 
 interp_message(ok, #{from := From} = State)
         when From /= undefined ->
     gen_server:reply(From, ok),
-    {[], State#{from => undefined,
+    {ok, State#{from => undefined,
                 ready => true}};
 
 interp_message({error, Reason}, #{from := From} = State)
         when From /= undefined ->
     gen_server:reply(From, {error, Reason}),
-    {[], State#{from => undefined}};
+    {ok, State#{from => undefined}};
 
 interp_message({error, Reason} = Error, State) ->
     notify_parent(Error, State),
     case error_disconnect(Reason) of
         true -> throw(disconnect);
-        _ -> {[], State}
+        _ -> {ok, State}
     end.
 
 error_disconnect(invalid_subject) -> false;
@@ -364,3 +388,16 @@ reconnect_timer(infinity) ->
 
 reconnect_timer(Interval) ->
     erlang:send_after(Interval, self(), reconnect_timeout).
+
+ssl_upgrade(#{<<"tls_required">> := true}, #{socket@ := Socket,
+                                             transport := Transport} = State) ->
+    case ssl:connect(Socket, []) of
+        {ok, NewSocket} ->
+            {ok, State#{socket@ => NewSocket,
+                        transport => Transport#{tls => true}}};
+        {error, _Reason} = Error ->
+            Error
+    end;
+
+ssl_upgrade(_, State) ->
+    {ok, State}.
