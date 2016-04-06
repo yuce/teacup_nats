@@ -44,7 +44,7 @@
 -include("teacup_nats_common.hrl").
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.3.4">>).
+-define(VERSION, <<"0.3.5">>).
 -define(SEND_TIMEOUT, 10).
 
 %% == Callbacks

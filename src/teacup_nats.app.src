@@ -1,6 +1,6 @@
 {application, teacup_nats,
  [{description, "Teacup based NATS Client for Erlang"},
-  {vsn, "0.3.4"},
+  {vsn, "0.3.5"},
   {registered, []},
   {applications,
    [kernel,
