@@ -5,6 +5,11 @@ high performance messaging platform.
 
 ## NEWS
 
+* **Cooking**: Version 0.3.4. New in this release:
+
+    * Rudimentary TLS/SSL support. Currently, this is auto-activated when the server
+    sends `tls_required => true` in an `INFO` message. 
+
 * **2016-04-03**: Released version 0.3.3. This release brings:
 
     * Using [teacup 0.3.3](https://github.com/yuce/teacup/tree/0.3.3),
