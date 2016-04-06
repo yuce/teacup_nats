@@ -5,7 +5,7 @@ high performance messaging platform.
 
 ## NEWS
 
-* **Cooking**: Version 0.3.4. New in this release:
+* **2016-04-07**: Version 0.3.4. New in this release:
 
     * Rudimentary TLS/SSL support. Currently, this is auto-activated when the server
     sends `tls_required => true` in an `INFO` message. 
