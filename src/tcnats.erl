@@ -75,7 +75,7 @@ pub(Ref, Subject) ->
     ok | {error, Reason :: term()}.
 
 pub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
-    teacup:call(Ref, {pub, Subject, Opts});    
+    teacup:call(Ref, {pub, Subject, Opts});
 
 pub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
     teacup:cast(Ref, {pub, Subject, Opts}).                        
