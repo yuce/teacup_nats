@@ -43,9 +43,6 @@
 
 -include("teacup_nats_common.hrl").
 
--define(DEFAULT_HOST, <<"127.0.0.1">>).
--define(DEFAULT_PORT, 4222).
-
 %% == API
 
 new() ->
@@ -106,49 +103,3 @@ unsub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
 
 unsub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
     teacup:cast(Ref, {unsub, Subject, Opts, self()}).
-
-% new() ->
-%     new(#{}).
- 
-% new(Opts) ->
-%     teacup:new(?SIGNATURE, Opts).
-
-% connect() ->
-%     connect(?DEFAULT_HOST, ?DEFAULT_PORT, #{}).
-    
-% connect(Host, Port) ->
-%     connect(Host, Port, #{}).
-    
-% connect(Host, Port, Opts) ->    
-%     NewOpts = Opts#{verbose => true},
-%     {ok, Conn} = teacup:new(?SIGNATURE, NewOpts),
-%     case teacup:call(Conn, {connect, Host, Port}) of
-%         ok ->
-%             {ok, Conn};
-%         {error, _Reason} = Error ->
-%             Error
-%     end.
-
-% pub(Ref, Subject) ->
-%     pub(Ref, Subject, #{}).
-    
-% -spec pub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
-%     ok | {error, Reason :: term()}.
-% pub(Ref, Subject, Opts) ->
-%     teacup:call(Ref, {pub, Subject, Opts}).
-
-% sub(Ref, Subject) ->
-%     sub(Ref, Subject, #{}).
-
-% -spec sub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
-%     ok | {error, Reason :: term()}.
-% sub(Ref, Subject, Opts) ->
-%     teacup:call(Ref, {sub, Subject, Opts, self()}).    
-
-% unsub(Ref, Subject) ->
-%     unsub(Ref, Subject, #{}).
-
-% -spec unsub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
-%     ok | {error, Reason :: term()}.
-% unsub(Ref, Subject, Opts) ->
-%     teacup:call(Ref, {unsub, Subject, Opts, self()}).
