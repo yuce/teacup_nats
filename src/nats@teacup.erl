@@ -159,6 +159,7 @@ teacup@info(batch_timeout, #{ready := false} = State) ->
 teacup@info(batch_timeout, #{batch := Batch} = State) ->
     send_batch(Batch),
     {noreply, State#{batch => [],
+                     batch_size => 0,
                      batch_timer => undefined}};
 
 teacup@info(reconnect_timeout, #{reconnect_try := ReconnectTry} = State) ->
