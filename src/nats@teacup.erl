@@ -46,6 +46,7 @@
 -define(MSG, ?MODULE).
 -define(VERSION, <<"0.3.5">>).
 -define(SEND_TIMEOUT, 10).
+-define(DEFAULT_MAX_BATCH_SIZE, 100).
 
 %% == Callbacks
 
@@ -156,11 +157,14 @@ teacup@info(ready, State) ->
 teacup@info(batch_timeout, #{ready := false} = State) ->
     {noreply, State#{batch_timer => undefined}};
 
-teacup@info(batch_timeout, #{batch := Batch} = State) ->
-    send_batch(Batch),
-    {noreply, State#{batch => [],
-                     batch_size => 0,
-                     batch_timer => undefined}};
+teacup@info(batch_timeout, #{batch := Batch,
+                             batch_size := BatchSize} = State) ->
+    NewState = send_batch(Batch, State),
+    case BatchSize > 1 of
+        true -> io:format("batch size: ~p~n", [BatchSize]);
+        _ -> ok
+    end,
+    {noreply, NewState};
 
 teacup@info(reconnect_timeout, #{reconnect_try := ReconnectTry} = State) ->
     NewState = State#{reconnect_try => ReconnectTry + 1},
@@ -180,6 +184,7 @@ default_opts() ->
       lang => <<"erlang">>,
       version => ?VERSION,
       buffer_size => 0,
+      max_batch_size => ?DEFAULT_MAX_BATCH_SIZE,
       reconnect => {undefined, 0}}.
 
 reset_state(State) ->
@@ -214,28 +219,6 @@ interp_messages([H|T], #{callbacks@ := #{teacup@error := TError}} = State) ->
         disconnect ->
             {stop, normal, State}
     end.
-
-% interp_messages(Messages, State) ->
-%     F = fun(M, {Rs, S}) ->
-%         case interp_message(M, S) of
-%             {[], NS} -> {Rs, NS}
-%             % {NR, NS} -> {[NR|Rs], NS}
-%         end
-%     end,
-%     try lists:foldl(F, {[], State}, Messages) of
-%         {Response, NewState} ->
-%             case Response of
-%                 [] -> ok;
-%                 _ -> teacup_server:send(self(), lists:reverse(Response))
-%             end,
-%             {noreply, NewState}
-%     catch
-%         throw:disconnect ->
-%             {stop, normal, State}
-%     end.
-
-% interp_message([], State) ->
-%     {[], State};
 
 interp_message(ping, State) ->
     % Send pong messages immediately
@@ -345,9 +328,16 @@ do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid} = State) ->
             queue_msg(BinMsg, State)
     end.
 
-send_batch([]) -> ok;
-send_batch(Batch) ->
-    teacup_server:send(self(), lists:reverse(Batch)).
+send_batch([], State) ->
+    State#{batch => [],
+           batch_size => 0,
+           batch_timer => undefined};
+
+send_batch(Batch, State) ->
+    teacup_server:send(self(), lists:reverse(Batch)),
+    State#{batch => [],
+           batch_size => 0,
+           batch_timer => undefined}.
 
 queue_msg(_, #{ready := false,
                buffer_size := Size,
@@ -356,6 +346,14 @@ queue_msg(_, #{ready := false,
     notify_parent({error, Reason}, State),
     {stop, {nats@teacup, Reason}, State};
 
+queue_msg(BinMsg, #{ready := true,
+                    batch := Batch,
+                    batch_size := MaxBatchSize,
+                    max_batch_size := MaxBatchSize} = State) ->
+    NewState = send_batch(Batch, State),
+    {noreply, NewState#{batch => [BinMsg],
+                        batch_size => 1}};
+    
 queue_msg(BinMsg, #{batch := Batch,
                     batch_timer := BatchTimer,
                     batch_size := BatchSize,
