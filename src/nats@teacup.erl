@@ -157,13 +157,8 @@ teacup@info(ready, State) ->
 teacup@info(batch_timeout, #{ready := false} = State) ->
     {noreply, State#{batch_timer => undefined}};
 
-teacup@info(batch_timeout, #{batch := Batch,
-                             batch_size := BatchSize} = State) ->
+teacup@info(batch_timeout, #{batch := Batch} = State) ->
     NewState = send_batch(Batch, State),
-    case BatchSize > 1 of
-        true -> io:format("batch size: ~p~n", [BatchSize]);
-        _ -> ok
-    end,
     {noreply, NewState};
 
 teacup@info(reconnect_timeout, #{reconnect_try := ReconnectTry} = State) ->
@@ -365,7 +360,7 @@ queue_msg(BinMsg, #{batch := Batch,
                               self(),
                               batch_timeout);
         _ ->
-            undefined
+            BatchTimer
     end,
     {noreply, State#{batch => NewBatch,
                      batch_timer => NewBatchTimer,
