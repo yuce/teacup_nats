@@ -32,8 +32,7 @@
 
 -export([new/0,
          new/1]).
--export([connect/0,
-         connect/2,
+-export([connect/2,
          connect/3,
          pub/2,
          pub/3,
@@ -55,9 +54,6 @@ new() ->
 new(Opts) ->
     teacup:new(?HANDLER, Opts).
 
-connect() ->
-    connect(?DEFAULT_HOST, ?DEFAULT_PORT, #{}).
-    
 connect(Host, Port) ->
     connect(Host, Port, #{}).
     
