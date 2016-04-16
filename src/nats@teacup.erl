@@ -341,13 +341,13 @@ queue_msg(_, #{ready := false,
     notify_parent({error, Reason}, State),
     {stop, {nats@teacup, Reason}, State};
 
-queue_msg(BinMsg, #{ready := true,
-                    batch := Batch,
-                    batch_size := MaxBatchSize,
-                    max_batch_size := MaxBatchSize} = State) ->
-    NewState = send_batch(Batch, State),
-    {noreply, NewState#{batch => [BinMsg],
-                        batch_size => 1}};
+% queue_msg(BinMsg, #{ready := true,
+%                     batch := Batch,
+%                     batch_size := MaxBatchSize,
+%                     max_batch_size := MaxBatchSize} = State) ->
+%     NewState = send_batch(Batch, State),
+%     {noreply, NewState#{batch => [BinMsg],
+%                         batch_size => 1}};
     
 queue_msg(BinMsg, #{batch := Batch,
                     batch_timer := BatchTimer,
