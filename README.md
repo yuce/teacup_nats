@@ -5,7 +5,7 @@ high performance messaging platform.
 
 ## NEWS
 
-* **2016-04-17**: Version 0.3.8:
+* **2016-04-17**: Version 0.4.0:
 
     * Renamed `tcnats` module to `nats`.
     * Added `nats:is_ready/1` function to check whether a NATS connection
