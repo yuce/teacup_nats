@@ -10,7 +10,8 @@ all() ->
      connect_fail_no_port,
      connect_verbose_ok,
      connect_verbose_fail,
-     connect_fail_reconnect_infinity].
+     connect_fail_reconnect_infinity,
+     pub_ok].
 
 init_per_testcase(_TestCase, Config) ->
     application:start(teacup),
@@ -101,4 +102,9 @@ connect_fail_reconnect_infinity(_) ->
     end,
     false = nats:is_ready(C).
 
-    
+    pub_ok(_) ->
+        {ok, C} = nats:connect(<<"127.0.0.1">>, 4222),
+        receive {C, ready} -> ok end,
+        nats:pub(C, <<"foo.bar">>, #{payload => <<"My payload">>}),
+        timer:sleep(100).
+        

@@ -45,6 +45,12 @@ in your `rebar.config`:
 {deps, [teacup_nats]}.
 ```
 
+If you are upgrading from an earlier version, you need to:
+
+```
+$ rebar3 updated && rebar3 upgrade
+```
+
 **teacup_nats** depends on the `teacup` app to be started. Include it in your `.app.src` file:
 
 ```erlang
@@ -72,7 +78,7 @@ $ rebar3 shell --apps teacup
 ## Running the Tests
 
 ```
-rebar3 ct --dir tests
+$ rebar3 ct
 ```
 
 ## TODO
