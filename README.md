@@ -5,6 +5,8 @@ high performance messaging platform.
 
 ## NEWS
 
+* **2016-04-16**: Version 0.3.5. This version fixes performance problems inroduced in version 0.3.3.
+
 * **2016-04-07**: Version 0.3.4. New in this release:
 
     * Rudimentary TLS/SSL support. Currently, this is auto-activated when the server
@@ -60,8 +62,6 @@ $ rebar3 shell --apps teacup
 ## TODO
 
 * Clustering
-* TLS transport support
-
 
 ## API
 
