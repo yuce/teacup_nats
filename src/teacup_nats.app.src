@@ -10,6 +10,6 @@
   {env,[]},
   {modules, []},
   {maintainers, ["Yuce Tekol"]},
-  {licenses, ["MIT"]},
+  {licenses, ["Apache 2.0"]},
   {links, [{git, "https://github.com/yuce/teacup_nats.git"}]}
  ]}.
