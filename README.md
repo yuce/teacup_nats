@@ -10,7 +10,7 @@ high performance messaging platform.
     * Renamed `tcnats` module to `nats`.
     * Added `nats:is_ready/1` function to check whether a NATS connection
     is ready (to pub, sub, unsub).
-    * Added initial tests
+    * Added initial tests.
 
 * **2016-04-16**: Version 0.3.7:
 
@@ -67,6 +67,12 @@ ok = application:start(teacup).
 
 ```
 $ rebar3 shell --apps teacup
+```
+
+## Running the Tests
+
+```
+rebar3 ct --dir tests
 ```
 
 ## TODO
