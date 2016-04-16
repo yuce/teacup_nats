@@ -19,19 +19,15 @@ main([Address, StrMsgCount]) ->
      io:format("Usage: escript bench.escript nats://HOST:PORT message_count~n").
    
 prepare_bench(Host, Port, MsgCount, Subject, Payload) ->
-    {Pub, Sub} = create_conns(Host, Port),
+    {ok, Sub} = nats:connect(Host, Port, #{verbose => true}), 
+    {ok, Pub} = nats:connect(Host, Port, #{buffer_size => 10}),
     F = fun() ->
         bench(Pub, Sub, MsgCount, Subject, Payload)
     end,
     {Time, ok} = timer:tc(F),
-     MsgsPerSec = round(MsgCount / (Time / 1000000)),
-     io:format("~p ~p ~p~n", [MsgCount, Time, MsgsPerSec]).
+    MsgsPerSec = round(MsgCount / (Time / 1000000)),
+    io:format("~p ~p ~p~n", [MsgCount, Time, MsgsPerSec]).
     
-create_conns(Host, Port) ->
-    {ok, Sub} = nats:connect(Host, Port, #{verbose => true}), 
-    {ok, Pub} = nats:connect(Host, Port, #{buffer_size => 10}),
-    {Pub, Sub}.
-
 bench(Pub, Sub, MsgCount, Subject, Payload) ->
     Me = self(),
     F = fun() ->
