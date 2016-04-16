@@ -11,5 +11,5 @@
   {modules, []},
   {maintainers, ["Yuce Tekol"]},
   {licenses, ["Apache 2.0"]},
-  {links, [{git, "https://github.com/yuce/teacup_nats.git"}]}
+  {links, [{"Github", "https://github.com/yuce/teacup_nats.git"}]}
  ]}.
