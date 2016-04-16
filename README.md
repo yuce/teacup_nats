@@ -5,7 +5,7 @@ high performance messaging platform.
 
 ## NEWS
 
-* **2016-04-16**: Version 0.3.5:
+* **2016-04-16**: Version 0.3.7:
 
     * Re-licenced the project under [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).    
     * This version fixes performance problems inroduced in version 0.3.3.
