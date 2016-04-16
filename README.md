@@ -48,7 +48,7 @@ in your `rebar.config`:
 If you are upgrading from an earlier version, you need to:
 
 ```
-$ rebar3 updated && rebar3 upgrade
+$ rebar3 update && rebar3 upgrade
 ```
 
 **teacup_nats** depends on the `teacup` app to be started. Include it in your `.app.src` file:
