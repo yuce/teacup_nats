@@ -12,7 +12,7 @@ main([Address, StrMsgCount]) ->
     Subject =  <<"0123456789012345">>,
     Payload = <<"0123456789012345012345678901234501234567890123450123456789012345">>,
     application:start(teacup),
-    {ok, Pub} = tcnats:connect(Host, Port),
+    {ok, Pub} = nats:connect(Host, Port),
     receive {Pub, ready} -> ok end,
     Time = bench(Pub, MsgCount, Subject, Payload),
     MsgsPerSec = round(MsgCount / (Time / 1000000)),
@@ -24,7 +24,7 @@ main(_) ->
 
 bench(Pub, MsgCount, Subject, Payload) ->
     F1 = fun(_) ->
-        tcnats:pub(Pub, Subject, #{payload => Payload})
+        nats:pub(Pub, Subject, #{payload => Payload})
     end,
     F2 = fun() ->
         lists:foreach(F1, lists:seq(1, MsgCount)),

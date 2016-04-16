@@ -31,15 +31,15 @@ prepare_bench(Host, Port, PublishCount, Subject, Payload) ->
     io:format("~p messages per second~n", [MsgsPerSec]).
     
 create_conns(Host, Port) ->
-    {ok, Sub} = tcnats:connect(Host, Port, #{verbose => true}),
-    {ok, Pub} = tcnats:connect(Host, Port),
+    {ok, Sub} = nats:connect(Host, Port, #{verbose => true}),
+    {ok, Pub} = nats:connect(Host, Port),
     loop_conn_ready(Pub),
     {Pub, Sub}.
 
 bench(Pub, Sub, PublishCount, Subject, Payload) ->
     Me = self(),
     F = fun() ->
-        ok = tcnats:sub(Sub, Subject),
+        ok = nats:sub(Sub, Subject),
         Me ! start,
         sub_loop(Sub, PublishCount),
         Me ! done
@@ -65,7 +65,7 @@ publish(_, _, _, 0) ->
     ok;
     
 publish(Pub, Subject, Payload, Left) ->
-    tcnats:pub(Pub, Subject, #{payload => Payload}),
+    nats:pub(Pub, Subject, #{payload => Payload}),
     publish(Pub, Subject, Payload, Left - 1).
 
 sub_loop(_Sub, 0) ->

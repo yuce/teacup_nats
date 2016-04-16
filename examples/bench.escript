@@ -1,6 +1,6 @@
 #! /usr/bin/env escript
 
-%%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
+%%! -pa _build/default/lib/teacup/ebin -pa _build/default/lib/teacup_nats/ebin -pa _build/default/lib/simpre/ebin pa _build/default/lib/nats_msg/ebin -pa _build/default/lib/jsx/ebin
 
 -mode(compile).
 
@@ -28,15 +28,14 @@ prepare_bench(Host, Port, MsgCount, Subject, Payload) ->
      io:format("~p ~p ~p~n", [MsgCount, Time, MsgsPerSec]).
     
 create_conns(Host, Port) ->
-    {ok, Sub} = tcnats:connect(Host, Port, #{verbose => true}), 
-    {ok, Pub} = tcnats:connect(Host, Port),
-    loop_conn_ready(Pub),
+    {ok, Sub} = nats:connect(Host, Port, #{verbose => true}), 
+    {ok, Pub} = nats:connect(Host, Port, #{buffer_size => 10}),
     {Pub, Sub}.
 
 bench(Pub, Sub, MsgCount, Subject, Payload) ->
     Me = self(),
     F = fun() ->
-        ok = tcnats:sub(Sub, Subject),
+        nats:sub(Sub, Subject),
         Me ! start,
         sub_loop(Sub, MsgCount),
         Me ! done
@@ -48,18 +47,11 @@ bench(Pub, Sub, MsgCount, Subject, Payload) ->
         done -> ok
     end.
 
-loop_conn_ready(Conn) ->
-    receive
-        {Conn, ready} -> ok
-    after 1000 ->
-        throw(conn_not_ready)     
-    end.
-
 publish(_, _, _, 0) ->
     ok;
     
 publish(Pub, Subject, Payload, Left) ->
-    tcnats:pub(Pub, Subject, #{payload => Payload}),
+    nats:pub(Pub, Subject, #{payload => Payload}),
     publish(Pub, Subject, Payload, Left - 1).
 
 sub_loop(_Sub, 0) ->
@@ -70,6 +62,5 @@ sub_loop(Sub, Left) ->
         {Sub, {msg, _Subject, _ReplyTo, _Payload}} ->
             sub_loop(Sub, Left - 1);
         _Other ->
-            io:format("OTHER: ~p~n", [_Other]),
             sub_loop(Sub, Left)
     end.

@@ -12,7 +12,7 @@
 % See the License for the specific language governing permissions and
 % limitations under the License.
 
--module(tcnats).
+-module(nats).
 
 -export([new/0,
          new/1]).
@@ -23,7 +23,8 @@
          sub/2,
          sub/3,
          unsub/2,
-         unsub/3]).
+         unsub/3,
+         is_ready/1]).
 
 -include("teacup_nats_common.hrl").
 
@@ -87,3 +88,12 @@ unsub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
 
 unsub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
     teacup:cast(Ref, {unsub, Subject, Opts, self()}).
+
+-spec is_ready(Ref :: teacup:teacup_ref()) ->
+    true | false.
+
+is_ready({teacup@ref, ?SIGNATURE, _} = Ref) ->
+    teacup:call(Ref, is_ready);
+
+is_ready({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref) ->
+    teacup:call(Ref, is_ready).

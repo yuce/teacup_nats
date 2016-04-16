@@ -5,6 +5,13 @@ high performance messaging platform.
 
 ## NEWS
 
+* **2016-04-17**: Version 0.3.8:
+
+    * Renamed `tcnats` module to `nats`.
+    * Added `nats:is_ready/1` function to check whether a NATS connection
+    is ready (to pub, sub, unsub).
+    * Added initial tests
+
 * **2016-04-16**: Version 0.3.7:
 
     * Re-licenced the project under [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).    
@@ -74,10 +81,10 @@ When using asycnhronous connections, you need to wait for a `{Conn, ready}`
 message before publishing messages, subcribing to/unsubscribing from subjects.
 
 * Connection functions:
-    * `tcnats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
-    * `tcnats:connect(Host :: binary(), Port :: integer())`: Connect to the NATS server
+    * `nats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
+    * `nats:connect(Host :: binary(), Port :: integer())`: Connect to the NATS server
     at `Host` and port `PORT`,
-    * `tcnats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
+    * `nats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
     above, but also takes an `Opts` map. Currently usable keys:
         * `verbose => true | false`: If `verbose == true`, NATS server
         sends an acknowledgement message on `pub`, `sub`, `unsub` operations and
@@ -92,20 +99,20 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
         the number of retrials before quitting. You can set `MaxRetry` to `infinity` to try reconnecting
         forever. The default is `{undefined, 0}`, "don't try to reconnect".
 * Publish functions:
-    * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
+    * `nats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
     the subject,
-    * `tcnats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
+    * `nats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
     the subject with `Options`. Valid options:
         * `payload => Payload :: binary()`,
         * `reply_to => Subject :: binary()`
 * Subscribe functions:
-    * `tcnats:sub(Conn :: teacup_ref(), Subject :: binary())`: Subscribe to the `Subject`,
-    * `tcnats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Subscribe to the `Subject`, with
+    * `nats:sub(Conn :: teacup_ref(), Subject :: binary())`: Subscribe to the `Subject`,
+    * `nats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Subscribe to the `Subject`, with
     `Options`. Valid options:
         * `queue_group => QGroup :: binary()`
 * Unsubscribe functions:
-    * `tcnats:unsub(Conn :: teacup_ref(), Subject :: binary())`: Unsubscribe from `Subject`,
-    * `tcnats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
+    * `nats:unsub(Conn :: teacup_ref(), Subject :: binary())`: Unsubscribe from `Subject`,
+    * `nats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
     `Options`. Valid options:
         * `max_messages => MaxMessages :: integer()`: Automatically unsubscribe after receiving `MaxMessages`.
 
@@ -114,13 +121,13 @@ message before publishing messages, subcribing to/unsubscribing from subjects.
 ```erlang
 main() ->
     % Connect to the NATS server
-    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222, #{buffer_size => 10}),
+    {ok, Conn} = nats:connect(<<"demo.nats.io">>, 4222, #{buffer_size => 10}),
     % We set the buffer_size, so messages will be collected on the client side
     %   until the connection is OK to use 
     % Publish some message
-    tcnats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
+    nats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
     % subscribe to some subject
-    tcnats:sub(Conn, <<"foo.*">>),
+    nats:sub(Conn, <<"foo.*">>),
     loop(Conn).
 
 loop(Conn) ->
@@ -135,7 +142,7 @@ loop(Conn) ->
 
 ### Synchronous Connection
 
-In order to activate the synchronous mode, just pass `#{verbose => true` to `tcnats:connect`.
+In order to activate the synchronous mode, just pass `#{verbose => true` to `nats:connect`.
 
 Connect, publish, subscribe and unsubscribe operations block and return either `ok` on
 success or `{error, Reason :: term()}` on failure.
@@ -145,12 +152,12 @@ success or `{error, Reason :: term()}` on failure.
 ```erlang
 main() ->
     % Connect to the NATS server
-    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
+    {ok, Conn} = nats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
     % The connection is OK to use
     % Publish some message
-    ok = tcnats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
+    ok = nats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
     % subscribe to some subject
-    ok = tcnats:sub(Conn, <<"foo.*">>),
+    ok = nats:sub(Conn, <<"foo.*">>),
     loop(Conn).
 
 loop(Conn) ->

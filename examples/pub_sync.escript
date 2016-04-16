@@ -10,12 +10,12 @@ main([Subject]) ->
 
 main([Subject, Payload]) ->
     application:start(teacup),
-    {ok, Conn} = tcnats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
+    {ok, Conn} = nats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
     Opts = case Payload of
         <<>> -> #{};
         _ ->
             BinPayload = list_to_binary(Payload),
             #{payload => BinPayload}
     end,
-    tcnats:pub(Conn, Subject, Opts),
+    nats:pub(Conn, Subject, Opts),
     application:stop(teacup).

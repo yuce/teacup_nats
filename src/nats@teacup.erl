@@ -108,7 +108,10 @@ teacup@call({sub, Subject, Opts, Pid}, From, State) ->
     do_sub(Subject, Opts, Pid, State#{from := From});
 
 teacup@call({unsub, Subject, Opts, Pid}, From, State) ->
-    do_unsub(Subject, Opts, Pid, State#{from := From}).
+    do_unsub(Subject, Opts, Pid, State#{from := From});
+
+teacup@call(is_ready, _From, #{ready := Ready} = State) ->
+    {reply, Ready, State}. 
 
 teacup@cast({connect, Host, Port}, State) ->
     do_connect(Host, Port),
