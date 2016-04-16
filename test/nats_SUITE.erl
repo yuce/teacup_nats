@@ -11,7 +11,12 @@ all() ->
      connect_verbose_ok,
      connect_verbose_fail,
      connect_fail_reconnect_infinity,
-     pub_ok].
+     pub_ok,
+     pub_verbose_ok,
+     pub_with_buffer_size,
+     sub_ok,
+     sub_verbose_ok,
+     unsub_verbose_ok].
 
 init_per_testcase(_TestCase, Config) ->
     application:start(teacup),
@@ -107,4 +112,58 @@ connect_fail_reconnect_infinity(_) ->
         receive {C, ready} -> ok end,
         nats:pub(C, <<"foo.bar">>, #{payload => <<"My payload">>}),
         timer:sleep(100).
+
+    pub_verbose_ok(_) ->
+        {ok, C} = nats:connect(<<"127.0.0.1">>, 4222,
+                               #{verbose => true}),
+        ok = nats:pub(C, <<"foo.bar">>, #{payload => <<"My payload">>}).
+    
+    pub_with_buffer_size(_) ->
+        {ok, C} = nats:connect(<<"127.0.0.1">>, 4222, #{buffer_size => 1}),
+        nats:pub(C, <<"foo.bar">>, #{payload => <<"My payload">>}),
+        timer:sleep(100).
+    
+    sub_ok(_) ->
+        Host = <<"127.0.0.1">>,
+        Port = 4222,
+        {ok, C} = nats:connect(Host, Port),
+        receive {C, ready} -> ok end,
+        nats:sub(C, <<"foo.*">>),
+        timer:sleep(100),
+        send_tcp_msg(Host, Port, <<"PUB foo.bar 0\r\n\r\n">>),
+        receive
+            {C, {msg, <<"foo.bar">>, _, <<>>}} -> ok
+        after 1000 ->
+            throw(did_not_receive_a_msg)
+        end.
+
+    sub_verbose_ok(_) ->
+        Host = <<"127.0.0.1">>,
+        Port = 4222,
+        {ok, C} = nats:connect(Host, Port, #{verbose => true}),
+        nats:sub(C, <<"foo.*">>),
+        send_tcp_msg(Host, Port, <<"PUB foo.bar 0\r\n\r\n">>),
+        receive
+            {C, {msg, <<"foo.bar">>, _, <<>>}} -> ok
+        after 1000 ->
+            throw(did_not_receive_a_msg)
+        end.
+    
+    unsub_verbose_ok(_) ->
+        {ok, C} = nats:connect(<<"127.0.0.1">>, 4222,
+                               #{verbose => true}),
+        nats:sub(C, <<"foo.*">>),
+        nats:unsub(C, <<"foo.*">>),
+        nats:pub(C, <<"foo.bar">>),
+        receive
+            {C, {msg, _, _, _}} ->
+                throw(didnt_expect_a_msg)
+        after 1000 ->
+            ok
+        end.
         
+send_tcp_msg(BinHost, Port, BinMsg) ->
+    Host = binary_to_list(BinHost),
+    {ok, Socket} = gen_tcp:connect(Host, Port, [binary, {packet, 0}]),
+    ok = gen_tcp:send(Socket, BinMsg),
+    ok = gen_tcp:close(Socket).
