@@ -29,7 +29,7 @@
 
 -define(MSG, ?MODULE).
 -define(VERSION, <<"0.4.0">>).
--define(SEND_TIMEOUT, 10).
+-define(DEFAULT_SEND_TIMEOUT, 10).
 -define(DEFAULT_MAX_BATCH_SIZE, 100).
 
 %% == Callbacks
@@ -56,17 +56,24 @@ teacup@status({disconnect, ForceDisconnect},
     notify_parent({status, disconnect}, State),
     case ForceDisconnect of
         false when MaxTrials /= Trial ->
-            reconnect_timer(Interval);
+            reconnect_timer(Interval),
+            {noreply, State#{ready => false,
+                             batch_timer => undefined}};
         _ ->
-            ok
-    end,
-    {noreply, State#{ready => false,
-                    batch_timer => undefined}};
+            %% There is actually no need to unsubscribe
+            %% since nats server will detect lost connection
+            %% and unsubscribe automatically
+            {stop, normal, State#{ready => false,
+                                  batch_timer => undefined}}
+    end;
 
 teacup@status({disconnect, _}, State) ->
     notify_parent({status, disconnect}, State),
-    {noreply, State#{ready => false,
-                     batch_timer => undefined}};
+    %% There is actually no need to unsubscribe
+    %% since nats server will detect lost connection
+    %% and unsubscribe automatically
+    {stop, normal, State#{ready => false,
+                          batch_timer => undefined}};
 
 teacup@status(Status, State) ->
     notify_parent({status, Status}, State),
@@ -110,8 +117,20 @@ teacup@call({sub, Subject, Opts, Pid}, From, State) ->
 teacup@call({unsub, Subject, Opts, Pid}, From, State) ->
     do_unsub(Subject, Opts, Pid, State#{from := From});
 
+% TODO: maybe handle #{ready := false}
+teacup@call({disconnect, _Pid}, _From, #{batch := Batch,
+                                         batch_timer := BatchTimer,
+                                         ref@ := Ref} = State) ->
+    case BatchTimer of
+        undefined -> ok;
+        _ -> erlang:cancel_timer(BatchTimer)
+    end,
+    NewState = send_batch(Batch, State),
+    ok = teacup:disconnect(Ref),
+    {reply, ok, NewState};
+
 teacup@call(is_ready, _From, #{ready := Ready} = State) ->
-    {reply, Ready, State}. 
+    {reply, Ready, State}.
 
 teacup@cast({connect, Host, Port}, State) ->
     do_connect(Host, Port),
@@ -167,6 +186,7 @@ default_opts() ->
       version => ?VERSION,
       buffer_size => 0,
       max_batch_size => ?DEFAULT_MAX_BATCH_SIZE,
+      send_timeout => ?DEFAULT_SEND_TIMEOUT,
       reconnect => {undefined, 0}}.
 
 reset_state(State) ->
@@ -305,6 +325,7 @@ do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid} = State) ->
         undefined ->
             {noreply, State};
         _ ->
+            %% TODO: Shouldn't we remove sid from the maps?
             MaxMsgs = maps:get(max_messages, Opts, undefined),
             BinMsg = nats_msg:unsub(Sid, MaxMsgs),
             queue_msg(BinMsg, State)
@@ -335,15 +356,16 @@ queue_msg(_, #{ready := false,
 %     NewState = send_batch(Batch, State),
 %     {noreply, NewState#{batch => [BinMsg],
 %                         batch_size => 1}};
-    
+
 queue_msg(BinMsg, #{batch := Batch,
                     batch_timer := BatchTimer,
                     batch_size := BatchSize,
+                    send_timeout := SendTimeout,
                     ready := Ready} = State) ->
     NewBatch = [BinMsg | Batch],
     NewBatchTimer = case {Ready, BatchTimer} of
         {true, undefined} ->
-            erlang:send_after(?SEND_TIMEOUT,
+            erlang:send_after(SendTimeout,
                               self(),
                               batch_timeout);
         _ ->
@@ -358,9 +380,9 @@ batch_timer(#{batch := []}) ->
 
 batch_timer(#{batch_timer := BatchTimer}) when BatchTimer /= undefined ->
     undefined;
-   
-batch_timer(_) ->
-    erlang:send_after(?SEND_TIMEOUT,
+
+batch_timer(#{send_timeout := SendTimeout}) ->
+    erlang:send_after(SendTimeout,
                       self(),
                       batch_timeout).
 
