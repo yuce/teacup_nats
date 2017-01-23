@@ -24,6 +24,7 @@
          sub/3,
          unsub/2,
          unsub/3,
+         disconnect/1,
          is_ready/1]).
 
 -include("teacup_nats_common.hrl").
@@ -88,6 +89,12 @@ unsub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
 
 unsub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
     teacup:cast(Ref, {unsub, Subject, Opts, self()}).
+
+-spec disconnect(Ref :: teacup:teacup_ref()) ->
+    ok | {error, Reason :: term()}.
+
+disconnect({teacup@ref, _, _} = Ref) ->
+    teacup:call(Ref, {disconnect, self()}).
 
 -spec is_ready(Ref :: teacup:teacup_ref()) ->
     true | false.
