@@ -11,6 +11,7 @@ all() ->
      connect_verbose_ok,
      connect_verbose_fail,
      connect_fail_reconnect_infinity,
+     disconnect_ok,
      pub_ok,
      pub_verbose_ok,
      pub_with_buffer_size,
@@ -106,6 +107,14 @@ connect_fail_reconnect_infinity(_) ->
         ok
     end,
     false = nats:is_ready(C).
+
+disconnect_ok(_) ->
+    Host = <<"127.0.0.1">>,
+    Port = 4222,
+    {ok, C} = nats:connect(Host, Port, #{verbose => true}),
+    ok = nats:disconnect(C),
+    {error, not_found} = nats:is_ready(C).
+
 
     pub_ok(_) ->
         {ok, C} = nats:connect(<<"127.0.0.1">>, 4222),
