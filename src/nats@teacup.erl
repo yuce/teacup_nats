@@ -318,17 +318,30 @@ do_sub(Subject, Opts, Pid, #{next_sid := DefaultSid,
                              sid_to_key => NewSidToKey,
                              key_to_sid => NewKeyToSid}).
 
-do_unsub(Subject, Opts, Pid, #{key_to_sid := KeyToSid} = State) ->
+do_unsub(Subject, Opts, Pid, #{sid_to_key := SidToKey,
+                               key_to_sid := KeyToSid} = State) ->
     % Should we crash if Sid for Pid not found?
-    Sid = maps:get({Subject, Pid}, KeyToSid, undefined),
+    K = {Subject, Pid},
+    Sid = maps:get(K, KeyToSid, undefined),
     case Sid of
         undefined ->
             {noreply, State};
         _ ->
-            %% TODO: Shouldn't we remove sid from the maps?
             MaxMsgs = maps:get(max_messages, Opts, undefined),
             BinMsg = nats_msg:unsub(Sid, MaxMsgs),
-            queue_msg(BinMsg, State)
+            % Only remove from maps if unconditional unsub.
+            NewState =
+                case MaxMsgs of
+                    undefined ->
+                        NewKeyToSid = maps:remove(K, KeyToSid),
+                        NewSidToKey = maps:remove(Sid, SidToKey),
+                        State#{sid_to_key => NewSidToKey,
+                               key_to_sid => NewKeyToSid};
+                    _ ->
+                        % How should we be able to cleanup in this case?
+                        State
+                end,
+            queue_msg(BinMsg, NewState)
     end.
 
 send_batch([], State) ->
