@@ -28,7 +28,7 @@
 -include("teacup_nats_common.hrl").
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.4.1">>).
+-define(VERSION, <<"0.4.2">>).
 -define(DEFAULT_SEND_TIMEOUT, 10).
 -define(DEFAULT_MAX_BATCH_SIZE, 100).
 
