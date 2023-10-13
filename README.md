@@ -5,6 +5,7 @@ high performance messaging platform.
 
 ## NEWS
 
+* Added hpub, hmsg, headers, example with pull + ack
 * Previous Versions check `https://github.com/yuce/teacup_nats`
 
 ## Getting Started
