@@ -20,6 +20,7 @@
          connect/3,
          pub/2,
          pub/3,
+         hpub/3,
          sub/2,
          sub/3,
          unsub/2,
@@ -60,11 +61,11 @@ pub(Ref, Subject) ->
 -spec pub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
     ok | {error, Reason :: term()}.
 
-pub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
-    teacup:call(Ref, {pub, Subject, Opts});
+pub(Ref, Subject, Opts) ->
+    teacup:cast(Ref, {pub, Subject, Opts}).
 
-pub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
-    teacup:cast(Ref, {pub, Subject, Opts}).                        
+hpub(Ref, Subject, Opts) ->
+    teacup:cast(Ref, {hpub, Subject, Opts}).
 
 sub(Ref, Subject) ->
     sub(Ref, Subject, #{}).
@@ -72,10 +73,7 @@ sub(Ref, Subject) ->
 -spec sub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
     ok | {error, Reason :: term()}.
 
-sub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
-    teacup:call(Ref, {sub, Subject, Opts, self()});
-
-sub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
+sub(Ref, Subject, Opts) ->
     teacup:cast(Ref, {sub, Subject, Opts, self()}).    
 
 unsub(Ref, Subject) ->
@@ -84,23 +82,17 @@ unsub(Ref, Subject) ->
 -spec unsub(Ref :: teacup:teacup_ref(), Subject :: binary(), Opts :: map()) ->
     ok | {error, Reason :: term()}.
 
-unsub({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref, Subject, Opts) ->
-    teacup:call(Ref, {unsub, Subject, Opts, self()});
-
-unsub({teacup@ref, ?SIGNATURE, _} = Ref, Subject, Opts) ->
+unsub(Ref, Subject, Opts) ->
     teacup:cast(Ref, {unsub, Subject, Opts, self()}).
 
 -spec disconnect(Ref :: teacup:teacup_ref()) ->
     ok | {error, Reason :: term()}.
 
-disconnect({teacup@ref, _, _} = Ref) ->
+disconnect(Ref) ->
     teacup:call(Ref, {disconnect, self()}).
 
 -spec is_ready(Ref :: teacup:teacup_ref()) ->
     true | false.
 
-is_ready({teacup@ref, ?SIGNATURE, _} = Ref) ->
-    teacup:call(Ref, is_ready);
-
-is_ready({teacup@ref, ?VERBOSE_SIGNATURE, _} = Ref) ->
+is_ready(Ref) ->
     teacup:call(Ref, is_ready).

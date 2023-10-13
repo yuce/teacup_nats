@@ -5,35 +5,7 @@ high performance messaging platform.
 
 ## NEWS
 
-* **2016-04-17**: Version 0.4.0:
-
-    * Renamed `tcnats` module to `nats`.
-    * Added `nats:is_ready/1` function to check whether a NATS connection
-    is ready (to pub, sub, unsub).
-    * Added initial tests.
-
-* **2016-04-16**: Version 0.3.7:
-
-    * Re-licenced the project under [Apache 2.0 License](http://www.apache.org/licenses/LICENSE-2.0).    
-    * This version fixes performance problems introduced in version 0.3.3.
-
-* **2016-04-07**: Version 0.3.4:
-
-    * Rudimentary TLS/SSL support. Currently, this is auto-activated when the server
-    sends `tls_required => true` in an `INFO` message. 
-
-* **2016-04-03**: Version 0.3.3:
-
-    * Using [teacup 0.3.3](https://github.com/yuce/teacup/tree/0.3.3),
-    which boosts the performance by 50%.
-    * Implemented connect retry / reconnect strategy.
-    * Implemented message buffering.
-    * Sub and Unsub messages are queued.
-
-* **2016-03-27**: You can check how the performance of **teacup_nats** compares to other NATS clients
-[here](https://github.com/yuce/nats-client-benchmarks).
-
-* **2016-03-19**: Initial release.
+* Previous Versions check `https://github.com/yuce/teacup_nats`
 
 ## Getting Started
 
@@ -45,45 +17,6 @@ in your `rebar.config`:
 {deps, [teacup_nats]}.
 ```
 
-If you are upgrading from an earlier version, you need to:
-
-```
-$ rebar3 update && rebar3 upgrade
-```
-
-**teacup_nats** depends on the `teacup` app to be started. Include it in your `.app.src` file:
-
-```erlang
-...
-  {applications,
-   [kernel,
-    stdlib,
-    teacup
-   ]},
-...
-```
-
-Or, start it manually:
-
-```erlang
-ok = application:start(teacup).
-```
-
-**rebar3** has a nice way of starting apps in the shell, you can try:
-
-```
-$ rebar3 shell --apps teacup
-```
-
-## Running the Tests
-
-```
-$ rebar3 ct
-```
-
-## TODO
-
-* Clustering
 
 ## API
 

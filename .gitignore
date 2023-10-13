@@ -14,3 +14,12 @@ erl_crash.dump
 logs
 _build
 rebar.lock
+teacup_nats.d
+.erlang.mk/
+doc/guide.pdf
+doc/html
+test/logs/
+test/packages/
+test/test_rebar_git/
+
+deps/

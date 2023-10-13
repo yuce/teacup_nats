@@ -28,24 +28,18 @@
 -include("teacup_nats_common.hrl").
 
 -define(MSG, ?MODULE).
--define(VERSION, <<"0.4.1">>).
+-define(VERSION, <<"1.0.0">>).
 -define(DEFAULT_SEND_TIMEOUT, 10).
 -define(DEFAULT_MAX_BATCH_SIZE, 100).
 
 %% == Callbacks
-
-teacup@signature(#{verbose := true}) ->
-    {ok, ?VERBOSE_SIGNATURE};
-
-teacup@signature(_) ->
-    {ok, ?SIGNATURE}.
+teacup@signature(_) -> ok.
 
 teacup@init(Opts) ->
     NewOpts = maps:merge(default_opts(), Opts),
     {ok, reset_state(NewOpts)}.
 
 teacup@status(connect, State) ->
-    nats_msg:init(),
     NewState = reset_state(State),
     notify_parent({status, connect}, State),
     {noreply, NewState};
@@ -142,6 +136,9 @@ teacup@cast(ping, #{ready := true} = State) ->
 
 teacup@cast({pub, Subject, Opts}, State) ->
     do_pub(Subject, Opts, State);
+
+teacup@cast({hpub, Subject, Opts}, State) ->
+    do_hpub(Subject, Opts, State);
 
 teacup@cast({sub, Subject, Opts, Pid}, State) ->
     do_sub(Subject, Opts, Pid, State);
@@ -258,6 +255,18 @@ interp_message({msg, {Subject, Sid, ReplyTo, Payload}},
     end,
     {ok, State};
 
+interp_message({hmsg, {Subject, Sid, ReplyTo, Headers, Payload}},
+               #{ref@ := Ref,
+                 sid_to_key := SidToKey} = State) ->
+    case maps:get(Sid, SidToKey, undefined) of
+        undefined -> ok;
+        {_, Pid} ->
+            Resp = {hmsg, Subject, ReplyTo, Headers, Payload},
+            Pid ! {Ref, Resp}
+    end,
+    {ok, State};
+
+
 interp_message(ok, #{from := From} = State)
         when From /= undefined ->
     gen_server:reply(From, ok),
@@ -298,6 +307,14 @@ do_connect() ->
 
 do_connect(Host, Port) ->
     teacup_server:connect(self(), Host, Port).
+
+
+do_hpub(Subject, Opts, State) ->
+    ReplyTo = maps:get(reply_to, Opts, undefined),
+    Headers = maps:get(headers, Opts, []),
+    Payload = maps:get(payload, Opts, <<>>),
+    BinMsg = nats_msg:hpub(Subject, ReplyTo, Headers, Payload),
+    queue_msg(BinMsg, State).
 
 do_pub(Subject, Opts, State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),
