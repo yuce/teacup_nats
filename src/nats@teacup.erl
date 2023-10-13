@@ -184,7 +184,8 @@ default_opts() ->
       buffer_size => 0,
       max_batch_size => ?DEFAULT_MAX_BATCH_SIZE,
       send_timeout => ?DEFAULT_SEND_TIMEOUT,
-      reconnect => {undefined, 0}}.
+      reconnect => {undefined, 0},
+      headers => false}.
 
 reset_state(State) ->
     Default = #{data_acc => <<>>,
@@ -290,7 +291,7 @@ error_disconnect(_) -> true.
 
 client_info(#{server_info := ServerInfo} = State) ->
     % Include user and name iff the server requires it
-    FieldsList = [verbose, pedantic, ssl_required, auth_token, name, lang, version],
+    FieldsList = [verbose, pedantic, ssl_required, auth_token, name, lang, version, headers],
     NewFieldsList = case maps:get(<<"auth_required">>, ServerInfo, false) of
         true -> [user, pass | FieldsList];
         _ -> FieldsList
@@ -307,7 +308,6 @@ do_connect() ->
 
 do_connect(Host, Port) ->
     teacup_server:connect(self(), Host, Port).
-
 
 do_hpub(Subject, Opts, State) ->
     ReplyTo = maps:get(reply_to, Opts, undefined),

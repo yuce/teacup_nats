@@ -17,56 +17,32 @@ in your `rebar.config`:
 {deps, [teacup_nats]}.
 ```
 
-
 ## API
 
-### Aysnchronous Connection
+* To do pull on consumer
 
-When using asycnhronous connections, you need to wait for a `{Conn, ready}`
-message before publishing messages, subcribing to/unsubscribing from subjects.
+```erlang
+%% make an inbox
+UUID = uuid:uuid_to_string(uuid:get_v4()),
+Inbox = iolist_to_binary(["_INBOX." UUID]),
+nats:sub(Conn, Inbox),
 
-* Connection functions:
-    * `nats:connect()`: Connect to the NATS server at address `127.0.0.1`, port `4222`,
-    * `nats:connect(Host :: binary(), Port :: integer())`: Connect to the NATS server
-    at `Host` and port `PORT`,
-    * `nats:connect(Host :: binary(), Port :: integer(), Opts :: map())`: Similar to
-    above, but also takes an `Opts` map. Currently usable keys:
-        * `verbose => true | false`: If `verbose == true`, NATS server
-        sends an acknowledgement message on `pub`, `sub`, `unsub` operations and
-        `connect` operation becomes synchronous.
-        * `user => User :: binary()`,
-        * `pass => Password :: binary()`,
-        * `buffer_size => MessageBufferSize :: non_neg_integer()`: The number of publish messages
-        to buffer before quitting. The default is 0. Setting `MesssageBufferSize` to
-        `infinity` enables unlimited buffering.
-        * `reconnect => {Interval :: non_neg_integer(), MaxRetry :: non_neg_integer()}`: Specifies
-        reconnect strategy. `Interval` is the time in milliseconds between retrials, and `MaxRetry` is
-        the number of retrials before quitting. You can set `MaxRetry` to `infinity` to try reconnecting
-        forever. The default is `{undefined, 0}`, "don't try to reconnect".
-* Publish functions:
-    * `nats:pub(Conn :: teacup_ref(), Subject :: binary())`: Publish message with only
-    the subject,
-    * `nats:pub(Conn :: teacup_ref(), Subject :: binary()), Opts :: map()`: Publish message
-    the subject with `Options`. Valid options:
-        * `payload => Payload :: binary()`,
-        * `reply_to => Subject :: binary()`
-* Subscribe functions:
-    * `nats:sub(Conn :: teacup_ref(), Subject :: binary())`: Subscribe to the `Subject`,
-    * `nats:sub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Subscribe to the `Subject`, with
-    `Options`. Valid options:
-        * `queue_group => QGroup :: binary()`
-* Unsubscribe functions:
-    * `nats:unsub(Conn :: teacup_ref(), Subject :: binary())`: Unsubscribe from `Subject`,
-    * `nats:unsub(Conn :: teacup_ref(), Subject :: binary(), Opts :: map())`: Unsubscribe from `Subject`, with
-    `Options`. Valid options:
-        * `max_messages => MaxMessages :: integer()`: Automatically unsubscribe after receiving `MaxMessages`.
+%% ask to get 1 message from consumer into inbox and delivered to us
+nats:pub(Conn, <<"$JS.API.CONSUMER.MSG.NEXT.<stream>.<consumer>">>, #{
+    reply_to    => Inbox,
+    payload     => jsx:encode(#{no_wait => true, batch => 1})
+}),
+%% to ack +ACK, NACK, ...
+nats:pub(Conn, ReplyTo, #{payload => <<"+ACK">>}).
+```
 
-#### Sample
+* Connection
 
 ```erlang
 main() ->
+    ConnectOpts = #{buffer_size => 10},
     % Connect to the NATS server
-    {ok, Conn} = nats:connect(<<"demo.nats.io">>, 4222, #{buffer_size => 10}),
+    {ok, Conn} = nats:connect(<<"demo.nats.io">>, 4222, ConnectOpts),
     % We set the buffer_size, so messages will be collected on the client side
     %   until the connection is OK to use 
     % Publish some message
@@ -85,35 +61,10 @@ loop(Conn) ->
     end.
 ```
 
-### Synchronous Connection
+`ConnectOpts` support
 
-In order to activate the synchronous mode, just pass `#{verbose => true` to `nats:connect`.
-
-Connect, publish, subscribe and unsubscribe operations block and return either `ok` on
-success or `{error, Reason :: term()}` on failure.
-
-#### Sample
-
-```erlang
-main() ->
-    % Connect to the NATS server
-    {ok, Conn} = nats:connect(<<"demo.nats.io">>, 4222, #{verbose => true}),
-    % The connection is OK to use
-    % Publish some message
-    ok = nats:pub(Conn, <<"teacup.control">>, #{payload => <<"start">>}),
-    % subscribe to some subject
-    ok = nats:sub(Conn, <<"foo.*">>),
-    loop(Conn).
-
-loop(Conn) ->
-    receive
-        {Conn, {msg, Subject, _ReplyTo, Payload}} ->
-            % Do something with the received message
-            io:format("~p: ~p~n", [Subject, Payload]),
-            loop(Conn)
-    end.
-
-```
+* `verbose => true`
+* `headers => true`
 
 ## License
 
